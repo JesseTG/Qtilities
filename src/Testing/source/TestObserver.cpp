@@ -22,7 +22,7 @@ void Qtilities::Testing::TestObserver::testRecursiveAttachment() {
     // Example tree using tree node classes to simplify test:
     TreeNode* rootNode = new TreeNode("Root");
     TreeNode* childNode = rootNode->addNode("Parent 1");
-    QVERIFY(childNode->attachSubject(rootNode) == false);
+    QVERIFY(!childNode->attachSubject(rootNode));
 }
 
 void Qtilities::Testing::TestObserver::testRecursiveAttachmentContained() {
@@ -34,7 +34,7 @@ void Qtilities::Testing::TestObserver::testRecursiveAttachmentContained() {
     // Now create and add a contained observer:
     TreeNode* containedNode = new TreeNode("Contained Node");
     containedNode->setParent(item);
-    QVERIFY(containedNode->attachSubject(rootNode) == false);
+    QVERIFY(!containedNode->attachSubject(rootNode));
 }
 
 void Qtilities::Testing::TestObserver::testAttachWithObserverLimit() {
@@ -44,8 +44,8 @@ void Qtilities::Testing::TestObserver::testAttachWithObserverLimit() {
 
     Observer observer1;
     Observer observer2;
-    QVERIFY(observer1.attachSubject(obj) == true);
-    QVERIFY(observer2.attachSubject(obj) == false);
+    QVERIFY(observer1.attachSubject(obj));
+    QVERIFY(!observer2.attachSubject(obj));
 }
 
 void Qtilities::Testing::TestObserver::testSubjectLimit() {
@@ -55,8 +55,8 @@ void Qtilities::Testing::TestObserver::testSubjectLimit() {
     QVERIFY(node.addItem("Item 1") != 0);
     QVERIFY(node.addItem("Item 2") != 0);
     QVERIFY(node.addItem("Item 3") == 0);
-    QVERIFY(node.setSubjectLimit(1) == false);
-    QVERIFY(node.setSubjectLimit(3) == true);
+    QVERIFY(!node.setSubjectLimit(1));
+    QVERIFY(node.setSubjectLimit(3));
     QVERIFY(node.addItem("Item 3") != 0);
 }
 
@@ -298,7 +298,7 @@ void Qtilities::Testing::TestObserver::testTreeCountContainment() {
     containedNode->setParent(item);
 
     LOG_INFO(QString::number(rootNode->treeCount()));
-    QVERIFY(rootNode->treeCount() == 11);
+    QCOMPARE(rootNode->treeCount(), 11);
 }
 
 void Qtilities::Testing::TestObserver::testTreeAtContainment() {

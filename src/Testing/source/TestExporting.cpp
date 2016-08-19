@@ -29,8 +29,8 @@ void Qtilities::Testing::TestExporting::testPropertyNameEncoding() {
     const char* char_name = string_name.toUtf8().constData();
     QString string_name_2 = QString(char_name);
     const char* char_name_2 = string_name_2.toUtf8().constData();
-    QVERIFY(string_name == string_name_2);
-    QVERIFY(strcmp(char_name,char_name_2) == 0);
+    QCOMPARE(string_name, string_name_2);
+    QCOMPARE(strcmp(char_name,char_name_2), 0);
 }
 
 void Qtilities::Testing::TestExporting::genericTest(IExportable* obj_source, IExportable* obj_import_binary, IExportable* obj_import_xml, Qtilities::ExportVersion write_version, Qtilities::ExportVersion read_version, const QString& file_name) {
@@ -135,7 +135,7 @@ void Qtilities::Testing::TestExporting::testExportDynamicProperties_w1_0_r1_0() 
     file.open();
     QDataStream stream_out(&file);
     stream_out.setVersion(QDataStream::Qt_4_7);
-    QVERIFY(ObjectManager::exportObjectPropertiesBinary(obj_source,stream_out) == IExportable::Complete);
+    QCOMPARE(ObjectManager::exportObjectPropertiesBinary(obj_source,stream_out), IExportable::Complete);
     file.close();
 
     file.open();
@@ -143,7 +143,7 @@ void Qtilities::Testing::TestExporting::testExportDynamicProperties_w1_0_r1_0() 
     stream_in.setVersion(QDataStream::Qt_4_7);
 
     QVERIFY(!ObjectManager::compareDynamicProperties(obj_source,obj_import_binary));
-    QVERIFY(ObjectManager::importObjectPropertiesBinary(obj_import_binary,stream_in) == IExportable::Complete);
+    QCOMPARE(ObjectManager::importObjectPropertiesBinary(obj_import_binary,stream_in), IExportable::Complete);
     QVERIFY(ObjectManager::compareDynamicProperties(obj_source,obj_import_binary));
 
     // -------------------------------------------------
@@ -724,8 +724,8 @@ void Qtilities::Testing::TestExporting::testCodeEditorProjectItemWrapper_w1_0_r1
     QVERIFY(code_editor_widget_source.codeEditor()->toPlainText() != code_editor_widget_binary.codeEditor()->toPlainText());
     QVERIFY(code_editor_widget_source.codeEditor()->toPlainText() != code_editor_widget_xml.codeEditor()->toPlainText());
     genericTest(obj_source,obj_import_binary,obj_import_xml,Qtilities::Qtilities_1_0,Qtilities::Qtilities_1_0,"testCodeEditorProjectItemWrapper_w1_0_r1_0");
-    QVERIFY(code_editor_widget_source.codeEditor()->toPlainText() == code_editor_widget_binary.codeEditor()->toPlainText());
-    QVERIFY(code_editor_widget_source.codeEditor()->toPlainText() == code_editor_widget_xml.codeEditor()->toPlainText());
+    QCOMPARE(code_editor_widget_source.codeEditor()->toPlainText(), code_editor_widget_binary.codeEditor()->toPlainText());
+    QCOMPARE(code_editor_widget_source.codeEditor()->toPlainText(), code_editor_widget_xml.codeEditor()->toPlainText());
 
     // Compare output files:
     QString file_original_binary = QString("%1/%2.binary").arg(QtilitiesApplication::applicationSessionPath()).arg("testCodeEditorProjectItemWrapper_w1_0_r1_0");
@@ -901,7 +901,7 @@ void Qtilities::Testing::TestExporting::testObserver_w1_0_r1_0() {
         stream_out.setVersion(QDataStream::Qt_4_7);
         obj_source->setExportVersion(write_version);
         IExportable::ExportResultFlags result_flags = obj_source->exportBinaryExt(stream_out,ObserverData::ExportAllItems);
-        QVERIFY(result_flags == IExportable::Complete);
+        QCOMPARE(result_flags, IExportable::Complete);
         file.close();
 
         file.open(QIODevice::ReadOnly);
@@ -909,13 +909,13 @@ void Qtilities::Testing::TestExporting::testObserver_w1_0_r1_0() {
         QDataStream stream_in(&file);
         stream_in.setVersion(QDataStream::Qt_4_7);
         obj_import_binary->setExportVersion(read_version);
-        QVERIFY(obj_import_binary->importBinary(stream_in,import_list) == IExportable::Complete);
+        QCOMPARE(obj_import_binary->importBinary(stream_in,import_list), IExportable::Complete);
 
         QFile file1("testObserverExtendedAll_w1_0_r1_0_readback.binary");
         file1.open(QIODevice::WriteOnly);
         QDataStream stream_out1(&file1);
         stream_out1.setVersion(read_version);
-        QVERIFY(obj_import_binary->exportBinaryExt(stream_out1,ObserverData::ExportAllItems) == IExportable::Complete);
+        QCOMPARE(obj_import_binary->exportBinaryExt(stream_out1,ObserverData::ExportAllItems), IExportable::Complete);
         file1.close();
 
         // Compare output files:
