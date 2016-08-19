@@ -34,8 +34,6 @@
 #include "VersionDetails.h"
 #include <QtilitiesCore>
 
-#include <QDomDocument>
-
 using namespace QtilitiesCore;
 
 struct Qtilities::Examples::ExportingExample::VersionDetailsPrivateData {
@@ -113,30 +111,30 @@ Qtilities::Core::InstanceFactoryInfo Qtilities::Examples::ExportingExample::Vers
     return factoryData;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Examples::ExportingExample::VersionDetails::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Examples::ExportingExample::VersionDetails::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
     // Create a simple node and add our information to it:
-    QDomElement revision_data = doc->createElement("RevisionInfo");
-    object_node->appendChild(revision_data);
+    doc->writeStartElement("RevisionInfo");
 
     // Information in both version 0 and version 1 of our class:
-    revision_data.setAttribute("DescriptionBrief",d->description_brief);
-    revision_data.setAttribute("DescriptionDetailed",d->description_detailed);
-    revision_data.setAttribute("Minor",d->version_minor);
-    revision_data.setAttribute("Major",d->version_major);
+    doc->writeAttribute("DescriptionBrief",d->description_brief);
+    doc->writeAttribute("DescriptionDetailed",d->description_detailed);
+    doc->writeAttribute("Minor",QString::number(d->version_minor));
+    doc->writeAttribute("Major",QString::number(d->version_major));
 
     // Lets say we add a new parameter in the next version of the class:
     if (applicationExportVersion() == 1)
-        revision_data.setAttribute("NewAttribute",d->new_attribute_storage);
+        doc->writeAttribute("NewAttribute",d->new_attribute_storage);
+
+    doc->writeEndElement();
 
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Examples::ExportingExample::VersionDetails::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Examples::ExportingExample::VersionDetails::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
@@ -145,26 +143,26 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Examples:
 
     // Find our RevisionInfo element:
     IExportable::ExportResultFlags result = IExportable::Complete;
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); i++) {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc->readNextStartElement()) {
+        QString tag = doc->name().toString();
 
-        if (child.isNull())
-            continue;
+        if (tag == "RevisionInfo") {
+            QXmlStreamAttributes attributes = doc->attributes();
 
-        if (child.tagName() == "RevisionInfo") {
-            if (child.hasAttribute("DescriptionBrief"))
-                d->description_brief = child.attribute("DescriptionBrief");
-            if (child.hasAttribute("DescriptionDetailed"))
-                d->description_detailed = child.attribute("DescriptionDetailed");
-            if (child.hasAttribute("Minor"))
-                d->version_minor = child.attribute("Minor").toInt();
-            if (child.hasAttribute("Major"))
-                d->version_major = child.attribute("Major").toInt();
-            if (child.hasAttribute("NewAttribute") && applicationExportVersion() == 1)
-                d->new_attribute_storage = child.attribute("NewAttribute");
-            continue;
+            if (attributes.hasAttribute("DescriptionBrief"))
+                d->description_brief = attributes.value("DescriptionBrief").toString();
+
+            if (attributes.hasAttribute("DescriptionDetailed"))
+                d->description_detailed = attributes.value("DescriptionDetailed").toString();
+
+            if (attributes.hasAttribute("Minor"))
+                d->version_minor = attributes.value("Minor").toInt();
+
+            if (attributes.hasAttribute("Major"))
+                d->version_major = attributes.value("Major").toInt();
+
+            if (attributes.hasAttribute("NewAttribute") && applicationExportVersion() == 1)
+                d->new_attribute_storage = attributes.value("NewAttribute").toString();
         }
     }
 

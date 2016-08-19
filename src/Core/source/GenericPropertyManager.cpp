@@ -15,8 +15,6 @@
 #include <Observer>
 #include <ObserverHints>
 
-#include <QDomDocument>
-
 using namespace Qtilities::Core;
 
 namespace Qtilities {
@@ -436,12 +434,10 @@ IExportable::ExportResultFlags GenericPropertyManager::loadNewPropertiesFile(con
     return result;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManager::exportManagerProperties(QDomDocument* doc,
-                                                                                                            QDomElement* object_node,
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManager::exportManagerProperties(QXmlStreamWriter* doc,
                                                                                                             bool export_non_default,
                                                                                                             bool export_default,
                                                                                                             const QString& export_node_name) const {
-    Q_UNUSED(doc)
 
     // Go through all properties and check which ones do not match their default states:
     QList<GenericProperty*> all_properties = allProperties();
@@ -463,12 +459,12 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManag
     foreach (GenericProperty* prop, changed_properties) {
         if (!prop->isMacro()) {
             // Create new node:
-            QDomElement prop_element = doc->createElement(export_node_name);
-            object_node->appendChild(prop_element);
-            if (prop->exportXml(doc,&prop_element) != IExportable::Complete) {
+            doc->writeStartElement(export_node_name);
+            if (prop->exportXml(doc) != IExportable::Complete) {
                 LOG_TASK_WARNING("Export of build property \"" + prop->propertyName() + "\" was not complete.",exportTask());
                 all_successful = false;
             }
+            doc->writeEndElement();
         }
     }
 
@@ -478,26 +474,20 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManag
         return IExportable::Incomplete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManager::importManagerProperties(QDomDocument* doc,
-                                                                                                            QDomElement* object_node,
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManager::importManagerProperties(QXmlStreamReader* doc,
                                                                                                             const QString &export_node_name) {
-    Q_UNUSED(doc)
-    if (!object_node)
+    if (!doc)
         return IExportable::Failed;
 
     IExportable::ExportResultFlags result = IExportable::Complete;
     QList<QPointer<QObject> > import_list;
-    QDomNodeList itemNodes = object_node->childNodes();
-    for(int i = 0; i < itemNodes.count(); ++i) {
-        QDomNode itemNode = itemNodes.item(i);
-        QDomElement item = itemNode.toElement();
 
-        if (item.isNull())
-            continue;
+    while (doc->readNextStartElement()) {
+        QStringRef name = doc->name();
 
-        if (item.tagName() == export_node_name) {
+        if (name == export_node_name) {
             GenericProperty tmp_prop;
-            if (tmp_prop.importXml(doc,&item,import_list) == IExportable::Complete) {
+            if (tmp_prop.importXml(doc,import_list) == IExportable::Complete) {
                 // Now find the matching property, and set its value and editability:
                 GenericProperty* matching_property = containsProperty(tmp_prop.propertyName());
                 if (matching_property) {
@@ -509,21 +499,21 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericPropertyManag
 
                     // In this case we add the missing property:
                     matching_property = addProperty(tmp_prop.propertyName());
-                    matching_property->importXml(doc,&item,import_list);
-//                    // Only give this message when it happens on the main property set, not the reference property set:
-//                    if (element_name == QLatin1String("Property"))
-//                        LOG_TASK_INFO("Found property in build step which does not match any of the default properties with name: " + tmp_prop.propertyName() + ". This property will be added.",exportTask());
+                    matching_property->importXml(doc,import_list);
+    //                    // Only give this message when it happens on the main property set, not the reference property set:
+    //                    if (element_name == QLatin1String("Property"))
+    //                        LOG_TASK_INFO("Found property in build step which does not match any of the default properties with name: " + tmp_prop.propertyName() + ". This property will be added.",exportTask());
                 }
-            } else
+            } else {
                 result = IExportable::Incomplete;
+            }
         }
     }
 
     return result;
 }
 
-IExportable::ExportResultFlags GenericPropertyManager::exportMacros(GenericProperty::MacroMode macro_mode, QDomDocument *doc, QDomElement *object_node) {
-    Q_UNUSED(doc)
+IExportable::ExportResultFlags GenericPropertyManager::exportMacros(GenericProperty::MacroMode macro_mode, QXmlStreamWriter *doc) {
     QList<GenericProperty*> macros = macroProperties(macro_mode);
 
     // Now export only changed properties:
@@ -531,12 +521,12 @@ IExportable::ExportResultFlags GenericPropertyManager::exportMacros(GenericPrope
     int count = 0;
     foreach (GenericProperty* prop, macros) {
         // Create new node:
-        QDomElement macro_element = doc->createElement("scineric:macro");
-        object_node->appendChild(macro_element);
-        if (prop->exportXml(doc,&macro_element) != IExportable::Complete) {
+        doc->writeStartElement("scineric:macro");
+        if (prop->exportXml(doc) != IExportable::Complete) {
             LOG_TASK_WARNING("Export of build macro \"" + prop->propertyName() + "\" was not complete.",exportTask());
             all_successful = false;
         }
+        doc->writeEndElement();
         ++count;
     }
 
@@ -546,24 +536,19 @@ IExportable::ExportResultFlags GenericPropertyManager::exportMacros(GenericPrope
         return IExportable::Incomplete;
 }
 
-IExportable::ExportResultFlags GenericPropertyManager::importMacros(GenericProperty::MacroMode macro_mode, QDomDocument *doc, QDomElement *object_node) {
-    Q_UNUSED(doc)
-    if (!object_node)
+IExportable::ExportResultFlags GenericPropertyManager::importMacros(GenericProperty::MacroMode macro_mode, QXmlStreamReader *doc) {
+    if (!doc)
         return IExportable::Failed;
 
     IExportable::ExportResultFlags result = IExportable::Complete;
     QList<QPointer<QObject> > import_list;
-    QDomNodeList itemNodes = object_node->childNodes();
-    for(int i = 0; i < itemNodes.count(); ++i) {
-        QDomNode itemNode = itemNodes.item(i);
-        QDomElement item = itemNode.toElement();
 
-        if (item.isNull())
-            continue;
+    while (doc->readNextStartElement()) {
+        QStringRef name = doc->name();
 
-        if (item.tagName() == QLatin1String("scineric:macro")) {
+        if (name == "scineric:macro") {
             GenericProperty tmp_prop;
-            if (tmp_prop.importXml(doc,&item,import_list) == IExportable::Complete) {
+            if (tmp_prop.importXml(doc,import_list) == IExportable::Complete) {
                 // Now find the matching property, and set its value:
                 GenericProperty* matching_property = containsProperty(tmp_prop.propertyName());
                 if (matching_property) {
@@ -573,12 +558,13 @@ IExportable::ExportResultFlags GenericPropertyManager::importMacros(GenericPrope
                     // In this case we add the missing property:
                     matching_property = addProperty(tmp_prop.propertyName());
                     matching_property->setIsMacro(true);
-                    matching_property->importXml(doc,&item,import_list);
+                    matching_property->importXml(doc,import_list);
                     matching_property->setMacroMode(macro_mode);
                     LOG_TASK_INFO("Found macro in build configuration which does not match any of the default macros with name: " + tmp_prop.propertyName() + ". This macro will be added to the build configuration.",exportTask());
                 }
-            } else
+            } else {
                 result = IExportable::Incomplete;
+            }
         }
     }
 

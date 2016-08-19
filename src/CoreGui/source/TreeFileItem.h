@@ -18,6 +18,9 @@
 
 #include <QtilitiesFileInfo>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace CoreGui {
         using namespace Qtilities::Core;
@@ -55,7 +58,6 @@ namespace Qtilities {
         {
             Q_OBJECT
             Q_INTERFACES(Qtilities::Core::Interfaces::IExportable)
-            Q_ENUMS(PathDisplay)
 
         public:
             //! This enumeration provides the possible ways that tree file items can be displayed.
@@ -67,6 +69,7 @@ namespace Qtilities {
                 DisplayFilePath,        /*!< Display filePath(). */
                 DisplayActualFilePath   /*!< Display actualFilePath(). */
             };
+            Q_ENUM(PathDisplay)
 
             //! Constructs a TreeFileItem object.
             /*!
@@ -184,8 +187,8 @@ namespace Qtilities {
             // --------------------------------
             ExportModeFlags supportedFormats() const;
             InstanceFactoryInfo instanceFactoryInfo() const;
-            virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         signals:
             //! Signal which is emitted when the file path of this tree file item changes.

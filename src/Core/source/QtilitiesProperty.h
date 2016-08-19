@@ -21,6 +21,9 @@
 #include "Qtilities.h"
 #include "IExportable.h"
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace Core {
             using namespace Qtilities::Core::Interfaces;
@@ -143,8 +146,8 @@ namespace Qtilities {
                 virtual ExportModeFlags supportedFormats() const;
                 virtual IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
                 virtual IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-                virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-                virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+                virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+                virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
                 //! Converts a QString type_string and QString value_string to a matching QVariant.
                 static QVariant constructVariant(const QString& type_string, const QString& value_string);
@@ -281,11 +284,11 @@ if (prop.isValid() && prop.canConvert<MultiContextProperty>()) {
             virtual ExportModeFlags supportedFormats() const;
             virtual IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
             virtual IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
+            virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
             /*!
               This function will add a set of attributes directly to the object_node passed to it.
               */
-            virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         protected:
             QMap<quint32,QVariant>  context_map;
@@ -300,8 +303,8 @@ if (prop.isValid() && prop.canConvert<MultiContextProperty>()) {
 
         \subsection SharedProperty_changing_properties Getting and setting shared properties
 
-        Getting and setting shared properties are done by the Qtilities::Core::Observer class which provides easy to use functions to set and get properties and their values. For shared properties it is easy to get and set the value of the property because we do not need to know the context since the value is the same for all contexts.     
-        
+        Getting and setting shared properties are done by the Qtilities::Core::Observer class which provides easy to use functions to set and get properties and their values. For shared properties it is easy to get and set the value of the property because we do not need to know the context since the value is the same for all contexts.
+
         The following example shows how to construct and work with Qtilities::Core::SharedProperty.
 \code
 QObject* obj = new QObject();
@@ -326,13 +329,13 @@ QString text = obs->getMultiContextPropertyValue(obj,property_name).toString();
 // Or get the value of the property without the observer reference: Option 1
 SharedProperty shared_property1 = ObjectManager::getSharedProperty(property_name);
 if (shared_property1.isValid()) {
-	QString text1 = shared_property1->value().toString();
+    QString text1 = shared_property1->value().toString();
 }
 
 // Or get the value of the property without the observer reference: Option 2
 QVariant prop = obj->property(property_name);
 if (prop.isValid() && prop.canConvert<SharedProperty>()) {
-	QString text2 = (prop.value<SharedProperty>()).value().toString();
+    QString text2 = (prop.value<SharedProperty>()).value().toString();
 }
 \endcode
 
@@ -382,11 +385,11 @@ if (prop.isValid() && prop.canConvert<SharedProperty>()) {
             ExportModeFlags supportedFormats() const;
             virtual IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
             virtual IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
+            virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
             /*!
               This function will add a set of attributes directly to the object_node passed to it.
               */
-            virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         private:
             QVariant property_value;

@@ -16,6 +16,8 @@
 #include "QtilitiesCore_global.h"
 #include "IAvailablePropertyProvider.h"
 
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 #include <QList>
 #include <QStringList>
 
@@ -160,7 +162,7 @@ namespace Qtilities {
             // --------------------------------
             // IObjectManager Implementation
             // --------------------------------
-            Observer* observerReference(int id) const;             
+            Observer* observerReference(int id) const;
             Observer* objectPool();
             int registerObserver(Observer* observer);
             int getNewIteratorID() const;
@@ -206,17 +208,17 @@ namespace Qtilities {
               \note Conflicting properties will be replaced.
               */
             static IExportable::ExportResultFlags importObjectPropertiesBinary(QObject* obj, QDataStream& stream);
-            //! Exports all exportable dynamic properties about the object to the given QDomDocument and QDomElement.
+            //! Exports all exportable dynamic properties about the object to the given QXmlStreamWriter.
             /*!
               To use this function make sure that all the QVariants are exportable. See QtilitiesProperty::isExportableVariant() for more information.
               */
-            static IExportable::ExportResultFlags exportObjectPropertiesXml(const QObject* obj, QDomDocument* doc, QDomElement* object_node, PropertyTypeFlags property_types = AllPropertyTypes, Qtilities::ExportVersion version = Qtilities::Qtilities_Latest);
-            //! Streams exportable dynamic properties from the given QDomDocument and QDomElement and then add them to the QObject.
+            static IExportable::ExportResultFlags exportObjectPropertiesXml(const QObject* obj, QXmlStreamWriter* doc, PropertyTypeFlags property_types = AllPropertyTypes, Qtilities::ExportVersion version = Qtilities::Qtilities_Latest);
+            //! Streams exportable dynamic properties from the given QXmlStreamReader and then add them to the QObject.
             /*!
               \note Conflicting properties will be replaced.
               */
-            static IExportable::ExportResultFlags importObjectPropertiesXml(QObject* obj, QDomDocument* doc, QDomElement* object_node);
-            //! Streams exportable dynamic properties from the given QDomDocument and QDomElement and then add them to the QObject.
+            static IExportable::ExportResultFlags importObjectPropertiesXml(QObject* obj, QXmlStreamReader* doc);
+            //! Streams exportable dynamic properties from the given QXmlStreamReader and then add them to the QObject.
             /*!
               \note Conflicting properties will be replaced.
               \sa removeDynamicProperties().

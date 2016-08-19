@@ -23,7 +23,6 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
-#include <QDomDocument>
 
 #include <stdio.h>
 #include <time.h>
@@ -486,41 +485,42 @@ bool Qtilities::ExtensionSystem::ExtensionSystemCore::savePluginConfiguration(QS
         final_filtered = d->set_filtered_plugins;
     }
 
-    // Create the QDomDocument:
-    QDomDocument doc("QtilitiesPluginConfiguration");
-    QDomElement root = doc.createElement("QtilitiesPluginConfiguration");
-    root.setAttribute("ExportVersion",QString::number(version));
-    root.setAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
-    doc.appendChild(root);
+    QXmlStreamWriter doc(&file);
+
+    doc.setAutoFormatting(true);
+    doc.setAutoFormattingIndent(2);
+    doc.writeComment("Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString());
+    doc.writeStartDocument("1.0");
+    doc.writeAttribute("encoding", "UTF-8");
+
+    doc.writeStartElement("QtilitiesPluginConfiguration");
+    doc.writeAttribute("ExportVersion",QString::number(version));
+    doc.writeAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
 
     // ---------------------------------------------------
     // Do the actual export:
     // ---------------------------------------------------
     // Do XML of inactive and filter lists:
     // Inactive Plugins:
-    QDomElement inactive_node = doc.createElement("InactivePlugins");
-    root.appendChild(inactive_node);
+    doc.writeStartElement("InactivePlugins");
     foreach (const QString& name, final_inactive) {
-        QDomElement inactive_item = doc.createElement("PluginName");
-        inactive_item.setAttribute("Value",name);
-        inactive_node.appendChild(inactive_item);
+        doc.writeEmptyElement("PluginName");
+        doc.writeAttribute("Value",name);
     }
+    doc.writeEndElement();
 
     // Filtered Plugins:
-    QDomElement filtered_node = doc.createElement("FilteredPlugins");
-    root.appendChild(filtered_node);
+    doc.writeStartElement("FilteredPlugins");
     foreach (const QString& name, final_filtered) {
-        QDomElement filtered_item = doc.createElement("Expression");
-        filtered_item.setAttribute("Value",regExpToXml(name));
-        filtered_node.appendChild(filtered_item);
+        doc.writeEmptyElement("Expression");
+        doc.writeAttribute("Value",regExpToXml(name));
     }
+    doc.writeEndElement();
 
     // Put the complete doc in a string and save it to the file:
     // Still write it even if it fails so that we can check the output file for debugging purposes.
-    QString docStr = doc.toString(2);
-    docStr.prepend("<!--Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString() + "-->\n");
-    docStr.prepend("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    file.write(docStr.toUtf8());
+    doc.writeEndElement();
+    doc.writeEndDocument();
     file.close();
 
     return true;
@@ -535,8 +535,6 @@ bool Qtilities::ExtensionSystem::ExtensionSystemCore::loadPluginConfiguration(QS
     if (file_name.isEmpty())
         file_name = QDir::toNativeSeparators(d->active_configuration_file);
 
-    // Load the file into doc:
-    QDomDocument doc("QtilitiesPluginConfiguration");
     QFile file(file_name);
 
     if (!file.exists()) {
@@ -549,12 +547,15 @@ bool Qtilities::ExtensionSystem::ExtensionSystemCore::loadPluginConfiguration(QS
         return false;
     }
 
+    // Load the file into doc:
     QString docStr = file.readAll();
-    QString error_string;
-    int error_line;
-    int error_column;
-    if (!doc.setContent(docStr,&error_string,&error_line,&error_column)) {
-        LOG_WARNING(QString("The tree input file could not be parsed by QDomDocument. Error on line %1 column %2: %3").arg(error_line).arg(error_column).arg(error_string));
+    QXmlStreamReader doc(docStr);
+
+    if (doc.error() != QXmlStreamReader::NoError) {
+        QString error_string = doc.errorString();
+        int error_line = doc.lineNumber();
+        int error_column = doc.columnNumber();
+        LOG_WARNING(QString("The tree input file could not be parsed by QXmlStreamReader. Error on line %1 column %2: %3").arg(error_line).arg(error_column).arg(error_string));
         file.close();
         LOG_WARNING(QString("Failed to load plugin configuration from file: %1").arg(file_name));
         return false;
@@ -564,11 +565,13 @@ bool Qtilities::ExtensionSystem::ExtensionSystemCore::loadPluginConfiguration(QS
     // ---------------------------------------------------
     // Inspect file format:
     // ---------------------------------------------------
-    QDomElement root = doc.documentElement();
+    QXmlStreamAttributes attributes = doc.attributes();
+    doc.readNextStartElement();
     Qtilities::ExportVersion read_version;
+
     // Check the document version:
-    if (root.hasAttribute("ExportVersion")) {
-        read_version = (Qtilities::ExportVersion) root.attribute("ExportVersion").toInt();
+    if (attributes.hasAttribute("ExportVersion")) {
+        read_version = (Qtilities::ExportVersion) attributes.value("ExportVersion").toInt();
     } else {
         LOG_ERROR("The ExportVersion of the input file could not be determined. This might indicate that the input file is in the wrong format. The plugin configuration will not be parsed.");
         LOG_ERROR("Failed to load plugin configuration from file: " + file_name);
@@ -600,25 +603,15 @@ bool Qtilities::ExtensionSystem::ExtensionSystemCore::loadPluginConfiguration(QS
         filtered_plugins->clear();
 
     // Now check out all the children below the root node:
-    QDomNodeList childNodes = root.childNodes();
-    for(int i = 0; i < childNodes.count(); ++i) {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc.readNextStartElement()) {
+        QStringRef childName = doc.name();
 
-        if (child.isNull())
-            continue;
+        if (childName == "InactivePlugins") {
+            while (doc.readNextStartElement()) {
+                QXmlStreamAttributes inactiveAttr = doc.attributes();
 
-        if (child.tagName() == QLatin1String("InactivePlugins")) {
-            QDomNodeList inactiveItems = child.childNodes();
-            for(int i = 0; i < inactiveItems.count(); ++i) {
-                QDomNode inactiveNode = inactiveItems.item(i);
-                QDomElement inactiveItem = inactiveNode.toElement();
-
-                if (inactiveItem.isNull())
-                    continue;
-
-                if (inactiveItem.hasAttribute("Value")) {
-                    QString plugin_name = inactiveItem.attribute("Value");
+                if (inactiveAttr.hasAttribute("Value")) {
+                    QString plugin_name = inactiveAttr.value("Value").toString();
                     if (!inactive_plugins) {
                         if (!d->core_plugins.contains(plugin_name)) {
                             d->set_inactive_plugins << plugin_name;
@@ -630,24 +623,17 @@ bool Qtilities::ExtensionSystem::ExtensionSystemCore::loadPluginConfiguration(QS
                 }
             }
         }
+        else if (childName == "FilteredPlugins") {
+            while (doc.readNextStartElement()) {
+                QXmlStreamAttributes filteredAttr = doc.attributes();
 
-        if (child.tagName() == QLatin1String("FilteredPlugins")) {
-            QDomNodeList filteredItems = child.childNodes();
-            for(int i = 0; i < filteredItems.count(); ++i) {
-                QDomNode filteredNode = filteredItems.item(i);
-                QDomElement filteredItem = filteredNode.toElement();
-
-                if (filteredItem.isNull())
-                    continue;
-
-                if (filteredItem.hasAttribute("Value")) {
-                    QString plugin_name = filteredItem.attribute("Value");
+                if (filteredAttr.hasAttribute("Value")) {
+                    QString plugin_name = filteredAttr.value("Value").toString();
                     if (!filtered_plugins) {
                         d->set_filtered_plugins << xmlToRegExp(plugin_name);
                     } else {
                         filtered_plugins->append(plugin_name);
                     }
-
                 }
             }
         }

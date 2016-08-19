@@ -28,7 +28,6 @@
 #include <QMap>
 #include <QPointer>
 #include <QtCore>
-#include <QDomDocument>
 
 using namespace Qtilities::Core::Constants;
 using namespace Qtilities::Core::Properties;
@@ -520,7 +519,7 @@ IExportable::ExportResultFlags Qtilities::Core::ObjectManager::importObjectPrope
     return IExportable::Complete;
 }
 
-IExportable::ExportResultFlags Qtilities::Core::ObjectManager::exportObjectPropertiesXml(const QObject* obj, QDomDocument* doc, QDomElement* object_node, PropertyTypeFlags property_types, Qtilities::ExportVersion version) {
+IExportable::ExportResultFlags Qtilities::Core::ObjectManager::exportObjectPropertiesXml(const QObject* obj, QXmlStreamWriter* doc, PropertyTypeFlags property_types, Qtilities::ExportVersion version) {
     if (!obj)
         return IExportable::Failed;
 
@@ -565,37 +564,37 @@ IExportable::ExportResultFlags Qtilities::Core::ObjectManager::exportObjectPrope
         return IExportable::Complete;
 
     // Now do the export:
-    QDomElement property_node = doc->createElement("Properties");
-    object_node->appendChild(property_node);
+    doc->writeStartElement("Properties");
 
     // Some export format information:
-    property_node.setAttribute("ExportVersion",QString::number(version));
-    property_node.setAttribute("QtilitiesVersion",QtilitiesCoreApplication::qtilitiesVersionString());
+    doc->writeAttribute("ExportVersion",QString::number(version));
+    doc->writeAttribute("QtilitiesVersion",QtilitiesCoreApplication::qtilitiesVersionString());
 
     IExportable::ExportResultFlags result = IExportable::Complete;
 
     // Save all the properties:
     // Shared Properties:
-    property_node.setAttribute("PropertyS_Count",properties_shared.count());
+    doc->writeAttribute("PropertyS_Count",QString::number(properties_shared.count()));
     for (int i = 0; i < properties_shared.count(); ++i) {
-        QDomElement current_node = doc->createElement("PropertyS_" + QString::number(i));
-        property_node.appendChild(current_node);
+        doc->writeStartElement("PropertyS_" + QString::number(i));
+        IExportable::ExportResultFlags intermediate_result = properties_shared.at(i).exportXml(doc);
+        doc->writeEndElement();
 
-        IExportable::ExportResultFlags intermediate_result = properties_shared.at(i).exportXml(doc,&current_node);
         if (intermediate_result == IExportable::Failed)
             return intermediate_result;
 
         if (intermediate_result == IExportable::Incomplete)
             result = intermediate_result;
+
     }
 
     // Multi Context Properties:
-    property_node.setAttribute("PropertyM_Count",properties_multi_context.count());
+    doc->writeAttribute("PropertyM_Count",QString::number(properties_multi_context.count()));
     for (int i = 0; i < properties_multi_context.count(); ++i) {
-        QDomElement current_node = doc->createElement("PropertyM_" + QString::number(i));
-        property_node.appendChild(current_node);
+        doc->writeStartElement("PropertyM_" + QString::number(i));
+        IExportable::ExportResultFlags intermediate_result = properties_multi_context.at(i).exportXml(doc);
+        doc->writeEndElement();
 
-        IExportable::ExportResultFlags intermediate_result = properties_multi_context.at(i).exportXml(doc,&current_node);
         if (intermediate_result == IExportable::Failed)
             return intermediate_result;
 
@@ -604,23 +603,26 @@ IExportable::ExportResultFlags Qtilities::Core::ObjectManager::exportObjectPrope
     }
 
     // Normal QVariant Properties:
-    property_node.setAttribute("PropertyN_Count",properties_normal.count());
+    doc->writeAttribute("PropertyN_Count",QString::number(properties_normal.count()));
     for (int i = 0; i < properties_normal.count(); ++i) {
-        QDomElement current_node = doc->createElement("PropertyN");
-        property_node.appendChild(current_node);
+        doc->writeStartElement("PropertyN");
 
-        current_node.setAttribute("Type",properties_normal.values().at(i).typeName());
-        current_node.setAttribute("Name",properties_normal.keys().at(i));
+        doc->writeAttribute("Type",properties_normal.values().at(i).typeName());
+        doc->writeAttribute("Name",properties_normal.keys().at(i));
+
         if (properties_normal.values().at(i).type() == QVariant::StringList)
-            current_node.setAttribute("Value",properties_normal.values().at(i).toStringList().join(","));
+            doc->writeAttribute("Value",properties_normal.values().at(i).toStringList().join(","));
         else
-            current_node.setAttribute("Value",properties_normal.values().at(i).toString());
+            doc->writeAttribute("Value",properties_normal.values().at(i).toString());
+
+        doc->writeEndElement();
     }
+    doc->writeEndElement();
 
     return result;
 }
 
-IExportable::ExportResultFlags Qtilities::Core::ObjectManager::importObjectPropertiesXml(QObject* obj, QDomDocument* doc, QDomElement* object_node) {
+IExportable::ExportResultFlags Qtilities::Core::ObjectManager::importObjectPropertiesXml(QObject* obj, QXmlStreamReader* doc) {
     if (!obj)
         return IExportable::Failed;
 
@@ -630,26 +632,23 @@ IExportable::ExportResultFlags Qtilities::Core::ObjectManager::importObjectPrope
 
     IExportable::ExportResultFlags result = IExportable::Complete;
 
-    QDomNodeList itemNodes = object_node->childNodes();
-    for(int i = 0; i < itemNodes.count(); ++i) {
-        QDomNode itemNode = itemNodes.item(i);
-        QDomElement item = itemNode.toElement();
+    while (doc->readNextStartElement()) {
+        QStringRef name = doc->name();
 
-        if (item.isNull())
-            continue;
-
-        if (item.tagName() == QLatin1String("Properties")) {
+        if (name == "Properties") {
             // ---------------------------------------------------
             // Inspect xml document format:
             // ---------------------------------------------------
+            QXmlStreamAttributes attributes = doc->attributes();
             Qtilities::ExportVersion read_version;
-            if (item.hasAttribute("ExportVersion")) {
-                read_version = (Qtilities::ExportVersion) item.attribute("ExportVersion").toInt();
+
+            if (attributes.hasAttribute("ExportVersion")) {
+                read_version = (Qtilities::ExportVersion) attributes.value("ExportVersion").toInt();
             } else {
                 LOG_ERROR(QString(tr("The export version of the xml property stream could not be determined. The properties for this object will not be parsed.")));
                 return IExportable::Failed;
             }
-            if (!item.hasAttribute("QtilitiesVersion")) {
+            if (!attributes.hasAttribute("QtilitiesVersion")) {
                 LOG_ERROR(QString(tr("The qtilities export version of the xml property stream could not be determined. The properties for this object will not be parsed.")));
                 return IExportable::Failed;
             }
@@ -665,47 +664,44 @@ IExportable::ExportResultFlags Qtilities::Core::ObjectManager::importObjectPrope
 
             QList<QPointer<QObject> > import_list;
 
-            QDomNodeList propertyNodes = item.childNodes();
-            for(int i = 0; i < propertyNodes.count(); ++i) {
-                QDomNode propertyNode = propertyNodes.item(i);
-                QDomElement property = propertyNode.toElement();
-
-                if (property.isNull())
-                    continue;
+            while (doc->readNextStartElement()) {
+                QStringRef property = doc->name();
 
                 // TODO : Check counts against imported property counts.
-                if (property.tagName().startsWith("PropertyS")) {
+                if (property.startsWith("PropertyS")) {
                     SharedProperty prop;
-                    IExportable::ExportResultFlags intermediate_result = prop.importXml(doc,&property,import_list);
+                    IExportable::ExportResultFlags intermediate_result = prop.importXml(doc,import_list);
                     if (intermediate_result == IExportable::Failed)
                         return intermediate_result;
+
                     if (intermediate_result == IExportable::Incomplete)
                         result = intermediate_result;
 
                     properties_shared << prop;
 
                     continue;
-                } else if (property.tagName().startsWith("PropertyM")) {
+                } else if (property.startsWith("PropertyM")) {
                     MultiContextProperty prop;
-                    IExportable::ExportResultFlags intermediate_result = prop.importXml(doc,&property,import_list);
+                    IExportable::ExportResultFlags intermediate_result = prop.importXml(doc,import_list);
                     if (intermediate_result == IExportable::Failed)
                         return intermediate_result;
+
                     if (intermediate_result == IExportable::Incomplete)
                         result = intermediate_result;
 
                     properties_multi_context << prop;
 
                     continue;
-                } else if (property.tagName().startsWith("PropertyN")) {
-                    if (property.hasAttribute("Name") && property.hasAttribute("Type") && property.hasAttribute("Value")) {
-                        QString property_name = property.attribute("Name");
-                        QString property_type = property.attribute("Type");
-                        QString property_value = property.attribute("Value");
+                } else if (property.startsWith("PropertyN")) {
+                    QXmlStreamAttributes attributes = doc->attributes();
+                    if (attributes.hasAttribute("Name") && attributes.hasAttribute("Type") && attributes.hasAttribute("Value")) {
+                        QString property_name = attributes.value("Name").toString();
+                        QString property_type = attributes.value("Type").toString();
+                        QString property_value = attributes.value("Value").toString();
                         properties_normal[property_name] = QtilitiesProperty::constructVariant(property_type,property_value);
-                    } else
+                    } else {
                         result = IExportable::Incomplete;
-
-                    continue;
+                    }
                 }
             }
 

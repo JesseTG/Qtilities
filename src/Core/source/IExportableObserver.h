@@ -16,8 +16,8 @@
 #include "IExportable.h"
 #include "ObserverData.h"
 
-class QDomDocument;
-class QDomElement;
+class QXmlStreamReader;
+class QXmlStreamWriter;
 
 namespace Qtilities {
     namespace Core {
@@ -38,9 +38,8 @@ namespace Qtilities {
 
                     return IExportable::Complete;
                 }
-                virtual IExportable::ExportResultFlags exportXmlExt(QDomDocument* doc, QDomElement* object_node, ObserverData::ExportItemFlags export_flags = ObserverData::ExportData) const {
+                virtual IExportable::ExportResultFlags exportXmlExt(QXmlStreamWriter* doc, ObserverData::ExportItemFlags export_flags = ObserverData::ExportData) const {
                     Q_UNUSED(doc)
-                    Q_UNUSED(object_node)
                     Q_UNUSED(export_flags)
 
                     return IExportable::Complete;

@@ -26,8 +26,6 @@
 #include <QList>
 #include <QHash>
 #include <QApplication>
-#include <QDomDocument>
-#include <QDomElement>
 #include <QFile>
 #include <QTextStream>
 #include <QtDebug>
@@ -337,44 +335,46 @@ void Qtilities::CoreGui::ActionManager::restoreDefaultShortcuts() {
 }
 
 bool Qtilities::CoreGui::ActionManager::saveShortcutMapping(const QString& file_name, Qtilities::ExportVersion version) {
-    QDomDocument doc("QtilitiesShortcutsMapping");
-    QDomElement root = doc.createElement("QtilitiesShortcutsMapping");
-    doc.appendChild(root);
-
-    // Export version:
-    root.setAttribute("ExportVersion",QString::number(version));
-    root.setAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
-
-    // All shortcuts:
-    QDomElement shortcuts = doc.createElement("Shortcuts");
-    root.appendChild(shortcuts);
-
-    Command* command = qobject_cast<Command*> (d->observer_commands.subjectAt(0));
-    SubjectIterator<Qtilities::CoreGui::Command> command_itr(command,
-                                                             &d->observer_commands);
-
-    if (command_itr.current()) {
-        QDomElement tag = doc.createElement("Shortcut_0");
-        tag.setAttribute("CommandID",command_itr.current()->defaultText());
-        tag.setAttribute("KeySequence",command_itr.current()->keySequence().toString());
-        shortcuts.appendChild(tag);
-    }
-
-    int count = 1;
-    while (command_itr.next()) {
-        ++count;
-        QDomElement tag = doc.createElement("Shortcut_" + QString::number(count));
-        tag.setAttribute("CommandID",command_itr.current()->defaultText());
-        tag.setAttribute("KeySequence",command_itr.current()->keySequence().toString());
-        shortcuts.appendChild(tag);
-    }
-
     QFile file(file_name);
     if (file.open(QFile::WriteOnly | QFile::Truncate)) {
-        QString docStr = doc.toString(2);
-        docStr.prepend("<!--Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString() + "-->\n");
-        docStr.prepend("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        file.write(docStr.toUtf8());
+        QXmlStreamWriter doc(&file);
+
+        doc.writeComment("Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString());
+        doc.setAutoFormatting(true);
+        doc.setAutoFormattingIndent(2);
+        doc.writeStartDocument("1.0");
+        doc.writeAttribute("encoding", "UTF-8");
+
+        doc.writeStartElement("QtilitiesShortcutsMapping");
+
+        // Export version:
+        doc.writeAttribute("ExportVersion",QString::number(version));
+        doc.writeAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
+
+        // All shortcuts:
+        doc.writeStartElement("Shortcuts");
+
+        Command* command = qobject_cast<Command*> (d->observer_commands.subjectAt(0));
+        SubjectIterator<Qtilities::CoreGui::Command> command_itr(command,
+                                                                 &d->observer_commands);
+
+        if (command_itr.current()) {
+            doc.writeEmptyElement("Shortcut_0");
+            doc.writeAttribute("CommandID",command_itr.current()->defaultText());
+            doc.writeAttribute("KeySequence",command_itr.current()->keySequence().toString());
+        }
+
+        int count = 1;
+        while (command_itr.next()) {
+            ++count;
+            doc.writeEmptyElement("Shortcut_" + QString::number(count));
+            doc.writeAttribute("CommandID",command_itr.current()->defaultText());
+            doc.writeAttribute("KeySequence",command_itr.current()->keySequence().toString());
+        }
+
+        doc.writeEndElement();
+        doc.writeEndElement();
+        doc.writeEndDocument();
         file.close();
         LOG_INFO("Successfully exported shortcut mapping for this session to: " + file_name);
         return true;
@@ -385,29 +385,32 @@ bool Qtilities::CoreGui::ActionManager::saveShortcutMapping(const QString& file_
 }
 
 bool Qtilities::CoreGui::ActionManager::loadShortcutMapping(const QString& file_name) {
-    QDomDocument doc("QtilitiesShortcutsMapping");
     QFile file(file_name);
     if (!file.open(QIODevice::ReadOnly))
         return false;
-    QString error_string;
-    int error_line;
-    int error_column;
-    if (!doc.setContent(&file,&error_string,&error_line,&error_column)) {
-        LOG_ERROR(QString(tr("The shortcut file could not be parsed by QDomDocument. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string));
+
+    QXmlStreamReader doc(file.readAll());
+    if (doc.error() != QXmlStreamReader::NoError) {
+        QString error_string = doc.errorString();
+        int error_line = doc.lineNumber();
+        int error_column = doc.columnNumber();
+
+        LOG_ERROR(QString(tr("The shortcut file could not be parsed by QXmlStreamReader. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string));
         file.close();
         return false;
     }
     file.close();
 
-    QDomElement root = doc.documentElement();
+    doc.readNextStartElement();
+    QXmlStreamAttributes attributes = doc.attributes();
 
     // ---------------------------------------------------
     // Inspect file format:
     // ---------------------------------------------------
     bool has_export_version = false;
     Qtilities::ExportVersion read_version;
-    if (root.hasAttribute("ExportVersion")) {
-        read_version = (Qtilities::ExportVersion) root.attribute("ExportVersion").toInt();
+    if (attributes.hasAttribute("ExportVersion")) {
+        read_version = (Qtilities::ExportVersion) attributes.value("ExportVersion").toInt();
         has_export_version = true;
     }
     if (!has_export_version) {
@@ -430,28 +433,17 @@ bool Qtilities::CoreGui::ActionManager::loadShortcutMapping(const QString& file_
     // ---------------------------------------------------
     // Do the actual import:
     // ---------------------------------------------------
-    QDomNodeList childNodes = root.childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc.readNextStartElement()) {
+        QStringRef childName = doc.name();
 
-        if (child.isNull())
-            continue;
+        if (childName == "Shortcuts") {
+            while (doc.readNextStartElement()) {
+                QStringRef name2 = doc.name();
 
-        if (child.tagName() == QLatin1String("Shortcuts")) {
-            QDomNodeList shortcutNodes = child.childNodes();
-            for(int i = 0; i < shortcutNodes.count(); ++i)
-            {
-                QDomNode shortcutNode = shortcutNodes.item(i);
-                QDomElement shortcut = shortcutNode.toElement();
-
-                if (shortcut.isNull())
-                    continue;
-
-                if (shortcut.tagName().startsWith("Shortcut_")) {
-                    QString commandID = shortcut.attribute("CommandID");
-                    QString key_sequence = shortcut.attribute("KeySequence");
+                if (name2.startsWith("Shortcut_")) {
+                    QXmlStreamAttributes attr = doc.attributes();
+                    QString commandID = attr.value("CommandID").toString();
+                    QString key_sequence = attr.value("KeySequence").toString();
                     if (d->observer_commands.containsSubjectWithName(commandID)) {
                         Command* command = qobject_cast<Command*> (d->observer_commands.subjectReference(commandID));
                         if (command) {
@@ -464,10 +456,8 @@ bool Qtilities::CoreGui::ActionManager::loadShortcutMapping(const QString& file_
                     } else {
                         LOG_WARNING(QString(tr("Unknown command found in the input shortcut mapping file: %1")).arg(commandID));
                     }
-                    continue;
                 }
             }
-            continue;
         }
     }
 

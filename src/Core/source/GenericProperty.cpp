@@ -10,8 +10,9 @@
 #include "QtilitiesCoreConstants.h"
 using namespace Qtilities::Core::Constants;
 
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 #include <ObjectManager>
-#include <QDomDocument>
 
 #include "limits.h"
 #include "float.h"
@@ -1168,9 +1169,8 @@ Qtilities::Core::InstanceFactoryInfo GenericProperty::instanceFactoryInfo() cons
     return fi;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericProperty::exportXml(QDomDocument* doc, QDomElement* object_node) const {
-    Q_UNUSED(doc);
-    if (!object_node)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericProperty::exportXml(QXmlStreamWriter* doc) const {
+    if (!doc)
         return IExportable::Failed;
 
     QList<SharedProperty> shared_properties;
@@ -1205,53 +1205,59 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericProperty::exp
     for (int i = 0; i < count; ++i) {
         SharedProperty property = shared_properties.at(i);
 
-        // Now do the export:
-        QDomElement property_element = doc->createElement(property.propertyNameString());
-        QDomText property_element_text = doc->createTextNode(property.value().toString());
-        property_element.appendChild(property_element_text);
-        object_node->appendChild(property_element);
+        doc->writeTextElement(property.propertyNameString(), property.value().toString());
     }
 
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericProperty::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags GenericProperty::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
-    if (!object_node)
+    if (!doc)
         return IExportable::Failed;
 
     bool has_value = false;
     bool has_name = false;
 
-    QDomElement element_1 = object_node->firstChildElement("name");
-    if (!element_1.isNull()) {
-        setPropertyName(element_1.text());
-        has_name = true;
-    }
-    QDomElement element_2 = object_node->firstChildElement("seperatorStorage");
-    if (!element_2.isNull())
-        d->list_storage_seperator = element_2.text();
-    QDomElement element_3 = object_node->firstChildElement("seperatorBackend");
-    if (!element_3.isNull())
-        d->list_backend_seperator = element_3.text();
+    while (doc->readNextStartElement()) {
+        QStringRef name = doc->name();
+        QString text = doc->readElementText();
 
-    // Note: Do the value only after the seperators have been restored:
-    QDomElement element_4 = object_node->firstChildElement("value");
-    if (!element_4.isNull()) {
-        d->value = listToBackendFormat(element_4.text());
-        has_value = true;
-    }
-
-    QDomElement element_5 = object_node->firstChildElement("note");
-    if (!element_5.isNull())
-        d->note = element_5.text();
-    QDomElement element_6 = object_node->firstChildElement("editable");
-    if (!element_6.isNull()) {
-        if (element_6.text().compare("true",Qt::CaseInsensitive) == 0)
-            d->editable = true;
-        else
-            d->editable = false;
+        if (name == "name") {
+            if (!text.isEmpty()) {
+                setPropertyName(text);
+                has_name = true;
+            }
+        }
+        else if (name == "seperatorStorage" || name == "separatorStorage") {
+            // backwards compatibility with a typo
+            if (!text.isEmpty()) {
+                d->list_storage_seperator = text;
+            }
+        }
+        else if (name == "seperatorBackend" || name == "separatorBackend") {
+            // backwards compatibility with a typo
+            if (!text.isEmpty()) {
+                d->list_backend_seperator = text;
+            }
+        }
+        else if (name == "value") {
+            // Note: Do the value only after the seperators have been restored:
+            if (!text.isEmpty()) {
+                d->value = listToBackendFormat(text);
+                has_value = true;
+            }
+        }
+        else if (name == "note") {
+            if (!text.isEmpty()) {
+                d->note = text;
+            }
+        }
+        else if (name == "editable") {
+            if (!text.isEmpty()) {
+                d->editable = (text.compare("true",Qt::CaseInsensitive) == 0);
+            }
+        }
     }
 
     setModificationState(true);

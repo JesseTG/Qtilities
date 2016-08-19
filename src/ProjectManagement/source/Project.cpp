@@ -20,7 +20,6 @@
 #include <FileUtils>
 
 #include <QFileInfo>
-#include <QDomElement>
 #include <QApplication>
 #include <QCursor>
 #include <QMessageBox>
@@ -91,18 +90,24 @@ bool Qtilities::ProjectManagement::Project::saveProject(const QString& file_name
         QTemporaryFile file;
         file.open();
 
-        // Create the QDomDocument:
-        QDomDocument doc("QtilitiesXMLProject");
-        QDomElement root = doc.createElement("QtilitiesXMLProject");
-        doc.appendChild(root);
+        QXmlStreamWriter doc(&file);
+        doc.setAutoFormatting(true);
+        doc.setAutoFormattingIndent(2);
+        doc.writeStartDocument("1.0");
+        doc.writeComment("Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString());
+        doc.writeStartElement("QtilitiesXMLProject");
 
         #ifdef QTILITIES_BENCHMARKING
         time_t start,end;
         time(&start);
         #endif
         IExportable::setExportTask(task);
-        IExportable::ExportResultFlags success = exportXml(&doc,&root);
+        IExportable::ExportResultFlags success = exportXml(&doc);
         IExportable::clearExportTask();
+
+        doc.writeEndElement();
+        doc.writeEndDocument();
+
         #ifdef QTILITIES_BENCHMARKING
         time(&end);
         double diff = difftime(end,start);
@@ -110,10 +115,6 @@ bool Qtilities::ProjectManagement::Project::saveProject(const QString& file_name
         #endif
 
         // Put the complete doc in a string and save it to the file:
-        QString docStr = doc.toString(2);
-        docStr.prepend("<!--Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString() + "-->\n");
-        docStr.prepend("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        file.write(docStr.toUtf8());
         file.close();
 
         if (success != IExportable::Failed) {
@@ -256,17 +257,9 @@ bool Qtilities::ProjectManagement::Project::loadProject(const QString& file_name
 
     if (file_name.endsWith(PROJECT_MANAGER->projectTypeSuffix(IExportable::XML))) {
         // Load the file into doc:
-        QDomDocument doc("QtilitiesXMLProject");
         QString docStr = file.readAll();
         file.close();
-        QString error_string;
-        int error_line;
-        int error_column;
-        if (!doc.setContent(docStr,&error_string,&error_line,&error_column)) {
-            LOG_TASK_ERROR_P(QString(tr("The tree input file could not be parsed by QDomDocument. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string),task);
-            return false;
-        }
-        QDomElement root = doc.documentElement();
+        QXmlStreamReader doc(docStr);
 
         // Interpret the loaded doc:
         QList<QPointer<QObject> > import_list;
@@ -276,13 +269,18 @@ bool Qtilities::ProjectManagement::Project::loadProject(const QString& file_name
         time(&start);
         #endif
         setExportTask(task);
-        IExportable::ExportResultFlags success = importXml(&doc,&root,import_list);
+        IExportable::ExportResultFlags success = importXml(&doc,import_list);
         clearExportTask();
         #ifdef QTILITIES_BENCHMARKING
         time(&end);
         double diff = difftime(end,start);
         LOG_TASK_INFO("Project XML import completed in " + QString::number(diff) + " seconds.",task);
         #endif
+
+        if (doc.hasError()) {
+            LOG_TASK_ERROR_P(QString(tr("The tree input file could not be parsed by QXmlStreamReader. Error on line %1 column %2: %3")).arg(doc.lineNumber()).arg(doc.columnNumber()).arg(doc.errorString()),task);
+            return false;
+        }
 
         if (success & IExportable::SuccessResult || success == IExportable::Complete) {
             // We change the project name to the selected file name
@@ -661,15 +659,15 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     return success;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::Project::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::Project::exportXml(QXmlStreamWriter* doc) const {
     // ---------------------------------------------------
     // Save file format information:
     // ---------------------------------------------------
-    object_node->setAttribute("ExportVersion",QString::number(exportVersion()));
-    object_node->setAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
-    object_node->setAttribute("ApplicationExportVersion",QString::number(applicationExportVersion()));
-    object_node->setAttribute("ApplicationVersion",QApplication::applicationVersion());
-    object_node->setAttribute("ApplicationName",QApplication::applicationName());
+    doc->writeAttribute("ExportVersion",QString::number(exportVersion()));
+    doc->writeAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
+    doc->writeAttribute("ApplicationExportVersion",QString::number(applicationExportVersion()));
+    doc->writeAttribute("ApplicationVersion",QApplication::applicationVersion());
+    doc->writeAttribute("ApplicationName",QApplication::applicationName());
 
     // ---------------------------------------------------
     // Do the actual export:
@@ -677,12 +675,12 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     IExportable::ExportResultFlags success = IExportable::Complete;
     for (int i = 0; i < d->project_items.count(); ++i) {
         QString name = d->project_items.at(i)->projectItemName();
-        QDomElement itemRoot = doc->createElement("ProjectItem_" + QString::number(i));
-        itemRoot.setAttribute("Name",name);
-        object_node->appendChild(itemRoot);
+        doc->writeStartElement("ProjectItem_" + QString::number(i));
+        doc->writeAttribute("Name",name);
         d->project_items.at(i)->setExportTask(exportTask());
-        IExportable::ExportResultFlags item_result = d->project_items.at(i)->exportXml(doc,&itemRoot);
+        IExportable::ExportResultFlags item_result = d->project_items.at(i)->exportXml(doc);
         d->project_items.at(i)->clearExportTask();
+        doc->writeEndElement();
         if (item_result == IExportable::Failed) {
             success = item_result;
             break;
@@ -695,32 +693,33 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     return success;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::Project::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::Project::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     // ---------------------------------------------------
     // Inspect file format:
     // ---------------------------------------------------
+    QXmlStreamAttributes attributes = doc->attributes();
     Qtilities::ExportVersion read_version;
-    if (object_node->hasAttribute("ExportVersion")) {
-        read_version = (Qtilities::ExportVersion) object_node->attribute("ExportVersion").toInt();
+    if (attributes.hasAttribute("ExportVersion")) {
+        read_version = (Qtilities::ExportVersion) attributes.value("ExportVersion").toInt();
         LOG_TASK_INFO(QString(tr("Inspecting project file format: Qtilities export format version: %1")).arg(read_version),exportTask());
     } else {
         LOG_TASK_ERROR(QString(tr("The export version of the input file could not be determined. This might indicate that the input file is in the wrong format. The project file will not be parsed.")),exportTask());
         QApplication::restoreOverrideCursor();
         return IExportable::Failed;
     }
-    if (object_node->hasAttribute("QtilitiesVersion"))
-        LOG_TASK_INFO(QString(tr("Inspecting project file format: Qtilities version used to save the file: %1")).arg(object_node->attribute("QtilitiesVersion")),exportTask());
+    if (attributes.hasAttribute("QtilitiesVersion"))
+        LOG_TASK_INFO(QString(tr("Inspecting project file format: Qtilities version used to save the file: %1")).arg(attributes.value("QtilitiesVersion").toString()),exportTask());
     quint32 application_read_version = 0;
-    if (object_node->hasAttribute("ApplicationExportVersion")) {
-        application_read_version = object_node->attribute("ApplicationExportVersion").toInt();
+    if (attributes.hasAttribute("ApplicationExportVersion")) {
+        application_read_version = attributes.value("ApplicationExportVersion").toUInt();
         LOG_TASK_INFO(QString(tr("Inspecting project file format: Application export format version: %1")).arg(application_read_version),exportTask());
     } else {
         LOG_TASK_ERROR(QString(tr("The application export version of the input file could not be determined. This might indicate that the input file is in the wrong format. The project file will not be parsed.")),exportTask());
         QApplication::restoreOverrideCursor();
         return IExportable::Failed;
     }
-    if (object_node->hasAttribute("ApplicationVersion"))
-        LOG_TASK_INFO(QString(tr("Inspecting project file format: Application version used to save the file: %1")).arg(object_node->attribute("ApplicationVersion")),exportTask());
+    if (attributes.hasAttribute("ApplicationVersion"))
+        LOG_TASK_INFO(QString(tr("Inspecting project file format: Application version used to save the file: %1")).arg(attributes.value("ApplicationVersion").toString()),exportTask());
 
     // ---------------------------------------------------
     // Check if input format is supported:
@@ -741,19 +740,15 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     // Do the actual import:
     // ---------------------------------------------------
     IExportable::ExportResultFlags success = IExportable::Complete;
-    QDomNodeList itemNodes = object_node->childNodes();
-    for(int i = 0; i < itemNodes.count(); ++i) {
-        QDomNode itemNode = itemNodes.item(i);
-        QDomElement item = itemNode.toElement();
+    while (doc->readNextStartElement()) {
+        QStringRef item = doc->name();
+        QXmlStreamAttributes attr = doc->attributes();
 
-        if (item.isNull())
-            continue;
-
-        if (item.tagName().startsWith("ProjectItem_")) {
+        if (item.startsWith("ProjectItem_")) {
             found_project_item = true;
             QString item_name;
-            if (item.hasAttribute("Name")) {
-                item_name = item.attribute("Name");
+            if (attr.hasAttribute("Name")) {
+                item_name = attr.value("Name").toString();
                 LOG_TASK_TRACE("Found project item in import file with name: " + item_name,exportTask());
             } else {
                 LOG_TASK_WARNING(tr("Nameless project item found in input file. This item will be skipped."),exportTask());
@@ -778,7 +773,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
                 item_iface->setExportVersion(read_version);
                 item_iface->setApplicationExportVersion(application_read_version);
                 item_iface->setExportTask(exportTask());
-                success = item_iface->importXml(doc,&item,import_list);
+                success = item_iface->importXml(doc,import_list);
                 item_iface->clearExportTask();
 
                 if (success & IExportable::FailedResult) {
@@ -787,7 +782,6 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
                     break;
                 }
             }
-            continue;
         }
     }
 

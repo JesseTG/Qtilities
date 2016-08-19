@@ -19,6 +19,9 @@
 
 #include <QObject>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace ProjectManagement {
         using namespace Qtilities::Logging;
@@ -79,8 +82,8 @@ namespace Qtilities {
             ExportModeFlags supportedFormats() const;
             IExportable::ExportResultFlags exportBinary(QDataStream& stream) const;
             IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             // --------------------------------
             // IObjectBase Implementation

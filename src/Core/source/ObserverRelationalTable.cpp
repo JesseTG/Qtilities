@@ -15,8 +15,6 @@
 
 #include <Logger>
 
-#include <QDomDocument>
-
 using namespace Qtilities::Core::Constants;
 
 // -------------------------------------------------------
@@ -242,62 +240,68 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Rel
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::RelationalTableEntry::exportXml(QDomDocument* doc, QDomElement* object_node) const {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::RelationalTableEntry::exportXml(QXmlStreamWriter* doc) const {
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (!object_node)
+    if (!doc)
         return IExportable::Failed;
 
-    object_node->setAttribute("Name",d->name);
+    doc->writeAttribute("Name",d->name);
     if (d->parents.count() > 0)
-        object_node->setAttribute("Parents",intListToString(d->parents));
+        doc->writeAttribute("Parents",intListToString(d->parents));
     if (d->children.count() > 0)
-        object_node->setAttribute("Children",intListToString(d->children));
-    object_node->setAttribute("VisitorID",QString::number(d->visitorID));
-    object_node->setAttribute("SessionID",QString::number(d->sessionID));
-    object_node->setAttribute("Ownership",QString::number(d->ownership));
-    object_node->setAttribute("ParentVisitorID",QString::number(d->parentVisitorID));
+        doc->writeAttribute("Children",intListToString(d->children));
+    doc->writeAttribute("VisitorID",QString::number(d->visitorID));
+    doc->writeAttribute("SessionID",QString::number(d->sessionID));
+    doc->writeAttribute("Ownership",QString::number(d->ownership));
+    doc->writeAttribute("ParentVisitorID",QString::number(d->parentVisitorID));
 
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::RelationalTableEntry::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::RelationalTableEntry::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (!object_node)
+    if (!doc)
         return IExportable::Failed;
 
-    if (object_node->hasAttribute("Name"))
-        d->name = object_node->attribute("Name");
+    QXmlStreamAttributes attributes = doc->attributes();
+
+    if (attributes.hasAttribute("Name"))
+        d->name = attributes.value("Name").toString();
     else
         return IExportable::Failed;
-    if (object_node->hasAttribute("Parents"))
-        d->parents = stringToIntList(object_node->attribute("Parents"));
-    if (object_node->hasAttribute("Children"))
-        d->children = stringToIntList(object_node->attribute("Children"));
-    if (object_node->hasAttribute("VisitorID"))
-        d->visitorID = object_node->attribute("VisitorID").toInt();
+
+    if (attributes.hasAttribute("Parents"))
+        d->parents = stringToIntList(attributes.value("Parents").toString());
+
+    if (attributes.hasAttribute("Children"))
+        d->children = stringToIntList(attributes.value("Children").toString());
+
+    if (attributes.hasAttribute("VisitorID"))
+        d->visitorID = attributes.value("VisitorID").toInt();
     else
         return IExportable::Failed;
-    if (object_node->hasAttribute("SessionID"))
-        d->sessionID = object_node->attribute("SessionID").toInt();
+
+    if (attributes.hasAttribute("SessionID"))
+        d->sessionID = attributes.value("SessionID").toInt();
     else
         return IExportable::Failed;
-    if (object_node->hasAttribute("Ownership"))
-        d->ownership = object_node->attribute("Ownership").toInt();
+
+    if (attributes.hasAttribute("Ownership"))
+        d->ownership = attributes.value("Ownership").toInt();
     else
         return IExportable::Failed;
-    if (object_node->hasAttribute("ParentVisitorID"))
-        d->parentVisitorID = object_node->attribute("ParentVisitorID").toInt();
+
+    if (attributes.hasAttribute("ParentVisitorID"))
+        d->parentVisitorID = attributes.value("ParentVisitorID").toInt();
     else
         return IExportable::Failed;
 
@@ -844,26 +848,23 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
         return IExportable::Failed;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverRelationalTable::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverRelationalTable::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (!object_node)
-        return IExportable::Failed;
-
     if (!doc)
         return IExportable::Failed;
 
-    object_node->setAttribute("EntryCount",d->entries.count());
+    doc->writeAttribute("EntryCount",QString::number(d->entries.count()));
     bool all_successful = true;
     for (int i = 0; i < d->entries.count(); ++i) {
-        QDomElement entry = doc->createElement("Entry_" + QString::number(i));
-        object_node->appendChild(entry);
+        doc->writeStartElement("Entry_" + QString::number(i));
         if (d->entries.values().at(i)) {
             d->entries.values().at(i)->setExportVersion(exportVersion());
-            d->entries.values().at(i)->exportXml(doc,&entry);
+            d->entries.values().at(i)->exportXml(doc);
         }
+        doc->writeEndElement();
     }
 
     if (all_successful)
@@ -872,33 +873,28 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
         return IExportable::Failed;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverRelationalTable::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
-    Q_UNUSED(import_list)
-
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverRelationalTable::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
+    QXmlStreamAttributes attributes = doc->attributes();
     int depth_readback = 0;
-    if (object_node->hasAttribute("EntryCount"))
-        depth_readback = object_node->attribute("EntryCount").toInt();
+    if (attributes.hasAttribute("EntryCount"))
+        depth_readback = attributes.value("EntryCount").toInt();
 
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc->readNext() != QXmlStreamReader::EndElement) {
+        QStringRef child = doc->name();
 
-        if (child.isNull())
-            continue;
-
-        if (child.tagName().startsWith("Entry_")) {
+        if (child.startsWith("Entry_")) {
             RelationalTableEntry* new_entry = new RelationalTableEntry;
             new_entry->setExportVersion(exportVersion());
-            if (new_entry->importXml(doc,&child,import_list) == IExportable::Complete)
+
+            if (new_entry->importXml(doc,import_list) == IExportable::Complete) {
                 d->entries[new_entry->visitorID()] = new_entry;
-            continue;
+            }
+
+            doc->skipCurrentElement();
         }
     }
 

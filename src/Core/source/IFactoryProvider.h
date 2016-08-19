@@ -24,8 +24,8 @@
 #include <QDataStream>
 #include <QtilitiesCategory>
 
-class QDomDocument;
-class QDomElement;
+class QXmlStreamReader;
+class QXmlStreamWriter;
 
 namespace Qtilities {
     namespace Core {

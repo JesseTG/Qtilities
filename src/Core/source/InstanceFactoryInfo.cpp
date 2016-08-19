@@ -12,12 +12,13 @@
 #include "IFactoryProvider.h"
 #include "QtilitiesCoreConstants.h"
 
-#include <QtXml>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
 using namespace Qtilities::Core::Constants;
 
-Qtilities::Core::InstanceFactoryInfo::InstanceFactoryInfo(QDomDocument* doc, QDomElement* object_node,Qtilities::ExportVersion version) {
-    importXml(doc,object_node,version);
+Qtilities::Core::InstanceFactoryInfo::InstanceFactoryInfo(QXmlStreamReader* doc,Qtilities::ExportVersion version) {
+    importXml(doc,version);
 }
 
 bool Qtilities::Core::InstanceFactoryInfo::isValid() {
@@ -63,36 +64,38 @@ bool Qtilities::Core::InstanceFactoryInfo::importBinary(QDataStream& stream, Qti
     return true;
 }
 
-bool Qtilities::Core::InstanceFactoryInfo::exportXml(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) const {
+bool Qtilities::Core::InstanceFactoryInfo::exportXml(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const {
     Q_UNUSED(version)
-    Q_UNUSED(doc)
+
+    doc->writeAttribute("InstanceFactoryInfo", d_instance_tag);
 
     if (d_factory_tag != QString(qti_def_FACTORY_QTILITIES))
-        object_node->setAttribute("FactoryTag", d_factory_tag);
-    object_node->setAttribute("InstanceFactoryInfo", d_instance_tag);
+        doc->writeAttribute("FactoryTag", d_factory_tag);
+
     if (d_instance_tag != d_instance_name)
-        object_node->setAttribute("Name", d_instance_name);
+        doc->writeAttribute("Name", d_instance_name);
 
     return true;
 }
 
-bool Qtilities::Core::InstanceFactoryInfo::importXml(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) {
+bool Qtilities::Core::InstanceFactoryInfo::importXml(QXmlStreamReader* doc, Qtilities::ExportVersion version) {
     Q_UNUSED(version)
-    Q_UNUSED(doc)
 
     // We don't do a version check here. Observer will do it for us.
 
-    if (object_node->hasAttribute("FactoryTag"))
-        d_factory_tag = object_node->attribute("FactoryTag");
+    QXmlStreamAttributes attributes = doc->attributes();
+
+    if (attributes.hasAttribute("FactoryTag"))
+        d_factory_tag = attributes.value("FactoryTag").toString();
     else
         d_factory_tag = QString(qti_def_FACTORY_QTILITIES);
 
-    d_instance_tag = object_node->attribute("InstanceFactoryInfo");
+    d_instance_tag = attributes.value("InstanceFactoryInfo").toString();
 
-    if (!object_node->hasAttribute("Name"))
+    if (!attributes.hasAttribute("Name"))
         d_instance_name = d_instance_tag;
     else
-        d_instance_name = object_node->attribute("Name");
+        d_instance_name = attributes.value("Name").toString();
 
     return true;
 }

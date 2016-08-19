@@ -12,7 +12,8 @@
 #include "IExportable.h"
 #include "QtilitiesCoreApplication.h"
 
-#include <QDomElement>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
 Qtilities::Core::Interfaces::IExportable::IExportable() {
     d_export_version = Qtilities::Qtilities_Latest;
@@ -65,16 +66,14 @@ Qtilities::Core::Interfaces::IExportable::Result IExportable::validateQtilitiesI
     return IExportable::VersionSupported;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Interfaces::IExportable::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Interfaces::IExportable::exportXml(QXmlStreamWriter* doc) const {
     Q_UNUSED(doc)
-    Q_UNUSED(object_node)
 
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Interfaces::IExportable::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Interfaces::IExportable::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(doc)
-    Q_UNUSED(object_node)
     Q_UNUSED(import_list)
 
     return IExportable::Complete;
@@ -86,34 +85,46 @@ void Qtilities::Core::Interfaces::IExportable::setApplicationExportVersion(quint
 }
 
 Qtilities::Core::Interfaces::IExportable *Qtilities::Core::Interfaces::IExportable::duplicate(QString* error_msg, int properties_to_copy, ExportResultFlags *result_flags) const {
-    // Export this interface to a QDomDocument:
-    QDomDocument doc("tmp");
-    QDomElement root = doc.createElement("tmp");
-    doc.appendChild(root);
-    if (!instanceFactoryInfo().exportXml(&doc,&root,Qtilities::Qtilities_Latest)) {
+    // Export this interface to a QXmlStreamWriter:
+    QString string;
+    QXmlStreamWriter doc(&string);
+    doc.writeStartDocument();
+    doc.writeStartElement("tmp");
+
+    if (!instanceFactoryInfo().exportXml(&doc,Qtilities::Qtilities_Latest)) {
         if (error_msg)
-            *error_msg = QString("%1: Failed to stream InstanceFactoryInfo to QDomDocument.").arg(Q_FUNC_INFO);
+            *error_msg = QString("%1: Failed to stream InstanceFactoryInfo to QXmlStreamWriter.").arg(Q_FUNC_INFO);
         if (result_flags)
             *result_flags = IExportable::Failed;
+
+        doc.writeEndElement();
+        doc.writeEndDocument();
         return 0;
     }
 
-    ExportResultFlags result = exportXml(&doc,&root);
+    ExportResultFlags result = exportXml(&doc);
     if (result & IExportable::FailedResult) {
         if (error_msg)
-            *error_msg = QString("%1: Failed to stream IExportable interface to QDomDocument.").arg(Q_FUNC_INFO);
+            *error_msg = QString("%1: Failed to stream IExportable interface to QXmlStreamWriter.").arg(Q_FUNC_INFO);
         if (result_flags)
             *result_flags = result;
+
+        doc.writeEndElement();
+        doc.writeEndDocument();
         return 0;
     }
 
     // Construct a new object using instance factory info:
-    InstanceFactoryInfo info(&doc,&root,Qtilities::Qtilities_Latest);
+    QXmlStreamReader read(string);
+    InstanceFactoryInfo info(&read,Qtilities::Qtilities_Latest);
     if (!info.isValid()) {
         if (error_msg)
             *error_msg = QString("%1: The factory info provided by InstanceFactoryInfo is not valid.").arg(Q_FUNC_INFO);
         if (result_flags)
             *result_flags = IExportable::Failed;
+
+        doc.writeEndElement();
+        doc.writeEndDocument();
         return 0;
     }
 
@@ -129,14 +140,17 @@ Qtilities::Core::Interfaces::IExportable *Qtilities::Core::Interfaces::IExportab
             new_inst = qobject_cast<IExportable*> (obj);
             if (new_inst) {
                 QList<QPointer<QObject> > import_list;
-                ExportResultFlags import_result = new_inst->importXml(&doc,&root,import_list);
+                ExportResultFlags import_result = new_inst->importXml(&read,import_list);
                 if (result_flags)
                     *result_flags = import_result;
 
                 if (import_result & IExportable::FailedResult) {
                     delete obj;
                     if (error_msg)
-                        *error_msg = QString("%1: Failed to import new object from QDomDocument.").arg(Q_FUNC_INFO);
+                        *error_msg = QString("%1: Failed to import new object from QXmlStreamReader.").arg(Q_FUNC_INFO);
+
+                    doc.writeEndElement();
+                    doc.writeEndDocument();
                     return 0;
                 } else {
                     // Copy properties if needed:
@@ -160,6 +174,9 @@ Qtilities::Core::Interfaces::IExportable *Qtilities::Core::Interfaces::IExportab
                     *error_msg = QString("%1: Failed to cast new object to IExportable.").arg(Q_FUNC_INFO);
                 if (result_flags)
                     *result_flags = IExportable::Failed;
+
+                doc.writeEndElement();
+                doc.writeEndDocument();
                 return 0;
             }
         }
@@ -168,6 +185,9 @@ Qtilities::Core::Interfaces::IExportable *Qtilities::Core::Interfaces::IExportab
             *error_msg = QString("%1: Could not locate the factory specified by the object's InstanceFactoryInfo.").arg(Q_FUNC_INFO);
         if (result_flags)
             *result_flags = IExportable::Failed;
+
+        doc.writeEndElement();
+        doc.writeEndDocument();
         return 0;
     }
 
@@ -175,6 +195,9 @@ Qtilities::Core::Interfaces::IExportable *Qtilities::Core::Interfaces::IExportab
         *error_msg = QString("%1: Reached end of function without newly constructed object.").arg(Q_FUNC_INFO);
     if (result_flags)
         *result_flags = IExportable::Failed;
+
+    doc.writeEndElement();
+    doc.writeEndDocument();
     return 0;
 }
 

@@ -13,8 +13,6 @@
 
 #include <Logger.h>
 
-#include <QDomElement>
-
 // -----------------------------------------
 // CategoryLevel
 // -----------------------------------------
@@ -45,27 +43,25 @@ Qtilities::Core::IExportable::ExportResultFlags Qtilities::Core::CategoryLevel::
     return IExportable::Complete;
 }
 
-Qtilities::Core::IExportable::ExportResultFlags Qtilities::Core::CategoryLevel::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::IExportable::ExportResultFlags Qtilities::Core::CategoryLevel::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    Q_UNUSED(doc)
-
-    object_node->setAttribute("Name",d_name);
+    doc->writeAttribute("Name",d_name);
     return IExportable::Complete;
 }
 
-Qtilities::Core::IExportable::ExportResultFlags Qtilities::Core::CategoryLevel::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::IExportable::ExportResultFlags Qtilities::Core::CategoryLevel::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (object_node->hasAttribute("Name")) {
-        d_name = object_node->attribute("Name");
+    QXmlStreamAttributes attributes = doc->attributes();
+    if (attributes.hasAttribute("Name")) {
+        d_name = attributes.value("Name").toString();
         return IExportable::Complete;
     }
 
@@ -219,19 +215,22 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Qti
         return IExportable::Failed;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::QtilitiesCategory::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::QtilitiesCategory::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    object_node->setAttribute("AccessMode",d_access_mode);
-    object_node->setAttribute("Depth",d_category_levels.count());
+    doc->writeAttribute("AccessMode",QString::number(d_access_mode));
+    doc->writeAttribute("Depth",QString::number(d_category_levels.count()));
     bool all_successful = true;
+
     for (int i = 0; i < d_category_levels.count(); ++i) {
-        QDomElement category_level = doc->createElement("CategoryLevel_" + QString::number(i));
-        object_node->appendChild(category_level);
-        if (d_category_levels.at(i).exportXml(doc,&category_level) != IExportable::Complete)
+        doc->writeStartElement("CategoryLevel_" + QString::number(i));
+
+        if (d_category_levels.at(i).exportXml(doc) != IExportable::Complete)
             all_successful = false;
+
+        doc->writeEndElement();
     }
 
     if (all_successful)
@@ -240,36 +239,30 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Qti
         return IExportable::Failed;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::QtilitiesCategory::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
-    Q_UNUSED(import_list)
-
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::QtilitiesCategory::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
     int depth_readback = 0;
 
-    if (object_node->hasAttribute("AccessMode"))
-        d_access_mode = object_node->attribute("AccessMode").toInt();
-    if (object_node->hasAttribute("Depth"))
-        depth_readback = object_node->attribute("Depth").toInt();
+    QXmlStreamAttributes attributes = doc->attributes();
+    if (attributes.hasAttribute("AccessMode"))
+        d_access_mode = attributes.value("AccessMode").toInt();
 
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    if (attributes.hasAttribute("Depth"))
+        depth_readback = attributes.value("Depth").toInt();
 
-        if (child.isNull())
-            continue;
+    while (doc->readNext() != QXmlStreamReader::EndElement) {
+        QStringRef child = doc->name();
 
-        if (child.tagName().startsWith("CategoryLevel")) {
+        if (child.startsWith("CategoryLevel")) {
             CategoryLevel category_level;
             category_level.setExportVersion(exportVersion());
-            category_level.importXml(doc,&child,import_list);
+            category_level.importXml(doc,import_list);
             addLevel(category_level);
-            continue;
+
+            doc->skipCurrentElement();
         }
     }
 

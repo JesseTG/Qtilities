@@ -19,6 +19,9 @@
 
 #include <Observer>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace ProjectManagement {
         using namespace Qtilities::ProjectManagement::Interfaces;
@@ -72,8 +75,8 @@ OBJECT_MANAGER->registerObject(project_item,QtilitiesCategory("Core::Project Ite
             virtual void clearExportTask();
             virtual IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
             virtual IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             //! Sets the export item flags to be used for this project item.
             /*!

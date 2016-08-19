@@ -13,8 +13,6 @@
 #include "TreeNode.h"
 #include "NamingPolicyFilter.h"
 
-#include <QDomElement>
-
 using namespace Qtilities::Core;
 
 Qtilities::CoreGui::AbstractTreeItem::AbstractTreeItem() {
@@ -128,134 +126,127 @@ bool Qtilities::CoreGui::AbstractTreeItem::setName(const QString& new_name, Obse
     return false;
 }
 
-IExportable::ExportResultFlags Qtilities::CoreGui::AbstractTreeItem::saveFormattingToXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) const {
+IExportable::ExportResultFlags Qtilities::CoreGui::AbstractTreeItem::saveFormattingToXML(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const {
     Q_UNUSED(version)
 
-    QDomElement formatting_data = doc->createElement("Formatting");
+    doc->writeStartElement("Formatting");
 
-    //if (hasAlignment())
-    //    formatting_data.setAttribute("Alignment",(int) getAlignment());
+    if (hasAlignment())
+        doc->writeAttribute("Alignment", QString::number((int) getAlignment()));
+
     if (hasBackgroundRole())
-        formatting_data.setAttribute("BackgroundColor",getBackgroundRole().color().name());
+        doc->writeAttribute("BackgroundColor",getBackgroundRole().color().name());
+
     if (hasForegroundRole())
-        formatting_data.setAttribute("ForegroundColor",getForegroundRole().color().name());
-    if (hasSizeHint()) {
-        QDomElement size_data = doc->createElement("Size");
-        formatting_data.appendChild(size_data);
-        QSize size = getSizeHint();
-        size_data.setAttribute("Width",size.width());
-        size_data.setAttribute("Height",size.height());
-    }
+        doc->writeAttribute("ForegroundColor",getForegroundRole().color().name());
+
     if (hasStatusTip())
-        formatting_data.setAttribute("StatusTip",getStatusTip());
+        doc->writeAttribute("StatusTip",getStatusTip());
+
     if (hasToolTip())
-        formatting_data.setAttribute("ToolTip",getToolTip());
+        doc->writeAttribute("ToolTip",getToolTip());
+
     if (hasWhatsThis())
-        formatting_data.setAttribute("WhatsThis",getWhatsThis());
-    if (hasFont()) {
-        QDomElement font_data = doc->createElement("Font");
-        formatting_data.appendChild(font_data);
-        QFont font = getFont();
-        font_data.setAttribute("Family",font.family());
-        font_data.setAttribute("PointSize",font.pointSize());
-        font_data.setAttribute("Weigth",font.weight());
-        if (font.bold())
-            font_data.setAttribute("Bold","True");
-        else
-            font_data.setAttribute("Bold","False");
-        if (font.italic())
-            font_data.setAttribute("Italic","True");
-        else
-            font_data.setAttribute("Italic","False");
+        doc->writeAttribute("WhatsThis",getWhatsThis());
+
+    if (hasSizeHint()) {
+        doc->writeEmptyElement("Size");
+        QSize size = getSizeHint();
+
+        doc->writeAttribute("Width",QString::number(size.width()));
+        doc->writeAttribute("Height",QString::number(size.height()));
     }
 
-    if (formatting_data.attributes().count() > 0 || formatting_data.childNodes().count() > 0)
-        object_node->appendChild(formatting_data);
+    if (hasFont()) {
+        doc->writeEmptyElement("Font");
+
+        QFont font = getFont();
+        doc->writeAttribute("Family",font.family());
+        doc->writeAttribute("PointSize",QString::number(font.pointSize()));
+        doc->writeAttribute("Weight",QString::number(font.weight()));
+
+        doc->writeAttribute("Bold", (font.bold() ? "True" : "False"));
+        doc->writeAttribute("Italic", (font.italic() ? "True" : "False"));
+    }
+
+    doc->writeEndElement();
 
     return IExportable::Complete;
 }
 
-IExportable::ExportResultFlags Qtilities::CoreGui::AbstractTreeItem::loadFormattingFromXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) {
-    Q_UNUSED(doc)
+IExportable::ExportResultFlags Qtilities::CoreGui::AbstractTreeItem::loadFormattingFromXML(QXmlStreamReader* doc, Qtilities::ExportVersion version) {
     Q_UNUSED(version)
 
-    QDomNodeList dataNodes = object_node->childNodes();
-    for(int i = 0; i < dataNodes.count(); ++i) {
-        QDomNode dataNode = dataNodes.item(i);
-        QDomElement data = dataNode.toElement();
+    // First get all attributes:
+    QXmlStreamAttributes attributes = doc->attributes();
 
-        if (data.isNull())
-            continue;
+    if (attributes.hasAttribute("Alignment")) {
+        setAlignment((Qt::AlignmentFlag) (attributes.value("Alignment").toInt()));
+    }
 
-        if (data.tagName() == QLatin1String("Formatting")) {
-            // First get all attributes:
-            //if (data.hasAttribute("Alignment")) {
-            //    setAlignment((Qt::Alignment) (data.attribute("Alignment").toInt()));
-            //}
-            if (data.hasAttribute("BackgroundColor")) {
-                QString color_name = data.attribute("BackgroundColor");
-                setBackgroundRole(QBrush(QColor(color_name)));
-            }
-            if (data.hasAttribute("ForegroundColor")) {
-                QString color_name = data.attribute("ForegroundColor");
-                setForegroundRole(QBrush(QColor(color_name)));
-            }
-            if (data.hasAttribute("StatusTip")) {
-                setStatusTip(data.attribute("StatusTip"));
-            }
-            if (data.hasAttribute("ToolTip")) {
-                setToolTip(data.attribute("ToolTip"));
-            }
-            if (data.hasAttribute("WhatsThis")) {
-                setWhatsThis(data.attribute("WhatsThis"));
-            }
+    if (attributes.hasAttribute("BackgroundColor")) {
+        QStringRef color_name = attributes.value("BackgroundColor");
+        setBackgroundRole(QBrush(QColor(color_name.toString())));
+    }
 
-            // Next get all child nodes:
-            QDomNodeList childNodes = data.childNodes();
-            for(int i = 0; i < childNodes.count(); ++i)
-            {
-                QDomNode childNode = childNodes.item(i);
-                QDomElement childElement = childNode.toElement();
+    if (attributes.hasAttribute("ForegroundColor")) {
+        QStringRef color_name = attributes.value("ForegroundColor");
+        setForegroundRole(QBrush(QColor(color_name.toString())));
+    }
 
-                if (childElement.isNull())
-                    continue;
+    if (attributes.hasAttribute("StatusTip")) {
+        setStatusTip(attributes.value("StatusTip").toString());
+    }
 
-                if (childElement.tagName() == QLatin1String("Size")) {
-                    int width = childElement.attribute("Width").toInt();
-                    int height = childElement.attribute("Height").toInt();
-                    QSize size(width,height);
-                    setSizeHint(size);
-                    continue;
+    if (attributes.hasAttribute("ToolTip")) {
+        setToolTip(attributes.value("ToolTip").toString());
+    }
+
+    if (attributes.hasAttribute("WhatsThis")) {
+        setWhatsThis(attributes.value("WhatsThis").toString());
+    }
+
+    // Next get all child nodes:
+    while (doc->readNext() != QXmlStreamReader::EndElement) {
+        QStringRef tag = doc->name();
+        QXmlStreamAttributes attr2 = doc->attributes();
+
+        if (tag == "Size") {
+            int width = attr2.value("Width").toInt();
+            int height = attr2.value("Height").toInt();
+            QSize size(width,height);
+            setSizeHint(size);
+
+            doc->skipCurrentElement();
+        }
+        else if (tag == "Font") {
+            if (attr2.hasAttribute("Family")) {
+                QStringRef family = attr2.value("Family");
+                int point_size = -1;
+                int weight = -1;
+                bool italic = false;
+
+                if (attr2.hasAttribute("PointSize")) {
+                    point_size = attr2.value("PointSize").toInt();
                 }
 
-                if (childElement.tagName() == QLatin1String("Font")) {
-                    if (childElement.hasAttribute("Family")) {
-                        QString family = childElement.attribute("Family");
-                        int point_size = -1;
-                        int weight = -1;
-                        bool italic = false;
-
-                        if (childElement.hasAttribute("PointSize"))
-                            point_size = childElement.attribute("PointSize").toInt();
-                        if (childElement.hasAttribute("Weigth"))
-                            weight = childElement.attribute("Weigth").toInt();
-                        if (childElement.hasAttribute("Italic")) {
-                            if (childElement.attribute("Italic") == QLatin1String("True"))
-                                italic = true;
-                            else
-                                italic = false;
-                        }
-
-                        QFont font(family,point_size,weight,italic);
-                        if (childElement.hasAttribute("Bold")) {
-                            if (childElement.attribute("Bold") == QLatin1String("True"))
-                                font.setBold(true);
-                        }
-                        setFont(font);
-                    }
-                    continue;
+                if (attr2.hasAttribute("Weight")) {
+                    weight = attr2.value("Weight").toInt();
                 }
+
+                if (attr2.hasAttribute("Italic")) {
+                    italic = (attr2.value("Italic") == "True");
+                }
+
+                QFont font(family.toString(),point_size,weight,italic);
+                if (attr2.hasAttribute("Bold")) {
+                    font.setBold(attr2.value("Bold") == QLatin1String("True"));
+                }
+
+                setFont(font);
             }
+
+            doc->skipCurrentElement();
         }
     }
 

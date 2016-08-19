@@ -31,6 +31,9 @@
 #include <QList>
 #include <QStringList>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace Core {
         class AbstractSubjectFilter;
@@ -508,7 +511,7 @@ In this example \p observerA will be deleted as soon as \p object1 is deleted.
               \note This function does not call detachAll() before doing the import.
               */
             virtual IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
+            virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
             /*!
               For subjects, the sequence in which the object reconstruction happens is as follows:
               - Construct object and set object name according to factory data.
@@ -519,13 +522,13 @@ In this example \p observerA will be deleted as soon as \p object1 is deleted.
 
               \note This function does not call detachAll() before doing the import.
               */
-            virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             // --------------------------------
             // IExportableObserver Implementation
             // --------------------------------
             virtual IExportable::ExportResultFlags exportBinaryExt(QDataStream& stream, ObserverData::ExportItemFlags export_flags = ObserverData::ExportData) const;
-            virtual IExportable::ExportResultFlags exportXmlExt(QDomDocument* doc, QDomElement* object_node, ObserverData::ExportItemFlags export_flags = ObserverData::ExportData) const;
+            virtual IExportable::ExportResultFlags exportXmlExt(QXmlStreamWriter* doc, ObserverData::ExportItemFlags export_flags = ObserverData::ExportData) const;
 
             // --------------------------------
             // IModificationNotifier Implementation

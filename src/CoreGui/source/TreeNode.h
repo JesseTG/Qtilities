@@ -159,8 +159,8 @@ tree_widget->show();
             // --------------------------------
             // IExportableFormatting Implementation
             // --------------------------------
-            IExportable::ExportResultFlags exportFormattingXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) const;
-            IExportable::ExportResultFlags importFormattingXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version);
+            IExportable::ExportResultFlags exportFormattingXML(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const;
+            IExportable::ExportResultFlags importFormattingXML(QXmlStreamReader* doc, Qtilities::ExportVersion version);
 
             // --------------------------------
             // AbstractTreeItem virtual overwrites

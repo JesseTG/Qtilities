@@ -19,8 +19,6 @@ using namespace Qtilities::CoreGui::Constants;
 using namespace Qtilities::Core::Constants;
 using namespace Qtilities::Core;
 
-#include <QDomElement>
-
 namespace Qtilities {
     namespace CoreGui {
         FactoryItem<QObject, TreeItem> TreeItem::factory;
@@ -73,24 +71,32 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeItem::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeItem::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    IExportable::ExportResultFlags result = saveFormattingToXML(doc,object_node,exportVersion());
+    IExportable::ExportResultFlags result = saveFormattingToXML(doc,exportVersion());
     return result;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeItem::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(object_node)
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeItem::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    return loadFormattingFromXML(doc,object_node,exportVersion());
+    IExportable::ExportResultFlags result = IExportable::Incomplete;
+
+    while (doc->readNext() != QXmlStreamReader::EndElement) {
+        QStringRef name = doc->name();
+
+        if (name == "Formatting") {
+            result = loadFormattingFromXML(doc,exportVersion());
+        }
+    }
+
+    return result;
 }
 

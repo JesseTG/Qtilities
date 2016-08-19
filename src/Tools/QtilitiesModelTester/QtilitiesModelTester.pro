@@ -8,9 +8,7 @@ QTILITIES += coregui
 QTILITIES += testing
 include(../../Qtilities.pri)
 
-QT       += core
-QT       += gui
-QT       += xml
+QT       += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4) {
 QT += widgets \

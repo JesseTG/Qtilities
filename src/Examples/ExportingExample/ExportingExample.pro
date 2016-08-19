@@ -6,8 +6,7 @@ QTILITIES += coregui
 include(../../Qtilities.pri)
 
 QT += core \
-      gui \
-      xml
+      gui
 
 greaterThan(QT_MAJOR_VERSION, 4) {
 QT += widgets \

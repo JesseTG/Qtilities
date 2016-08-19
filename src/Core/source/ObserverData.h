@@ -25,6 +25,9 @@
 #include <QMutex>
 #include <QHash>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace Core {
         class ObserverHints;
@@ -118,8 +121,8 @@ namespace Qtilities {
             void clearExportTask();
             IExportable::ExportResultFlags exportBinary(QDataStream& stream) const;
             IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             // --------------------------------
             // Extended Access Call Functions From Observer
@@ -127,7 +130,7 @@ namespace Qtilities {
             //! Extended binary export function.
             IExportable::ExportResultFlags exportBinaryExt(QDataStream& stream, ExportItemFlags export_flags) const;
             //! Extended XML export function.
-            IExportable::ExportResultFlags exportXmlExt(QDomDocument* doc, QDomElement* object_node, ExportItemFlags export_flags) const;
+            IExportable::ExportResultFlags exportXmlExt(QXmlStreamWriter* doc, ExportItemFlags export_flags) const;
 
             // --------------------------------
             // Export Implementations For Different Qtilities Versions
@@ -135,8 +138,8 @@ namespace Qtilities {
         private:
             IExportable::ExportResultFlags exportBinaryExt_1_0(QDataStream& stream, ExportItemFlags export_flags) const;
             IExportable::ExportResultFlags importBinaryExt_1_0(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXmlExt_1_0(QDomDocument* doc, QDomElement* object_node, ExportItemFlags export_flags) const;
-            IExportable::ExportResultFlags importXmlExt_1_0(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXmlExt_1_0(QXmlStreamWriter* doc, ExportItemFlags export_flags) const;
+            IExportable::ExportResultFlags importXmlExt_1_0(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             //! Construct relationships between a list of objects with the relational data being passed to the function as a RelationalObserverTable.
             bool constructRelationships(QList<QPointer<QObject> >& objects, ObserverRelationalTable* table) const;

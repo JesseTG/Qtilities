@@ -15,8 +15,10 @@
 #include "QtilitiesCore_global.h"
 #include "Qtilities.h"
 
-class QDomDocument;
-class QDomElement;
+#include <QString>
+
+class QXmlStreamReader;
+class QXmlStreamWriter;
 
 namespace Qtilities {
     namespace Core {
@@ -49,7 +51,7 @@ namespace Qtilities {
             InstanceFactoryInfo(QDataStream& stream, Qtilities::ExportVersion version) {
                 importBinary(stream,version);
             }
-            InstanceFactoryInfo(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version);
+            InstanceFactoryInfo(QXmlStreamReader* doc, Qtilities::ExportVersion version);
             /*!
               \param factory_tag The factory tag which identifies the factory to be used when constructing the new instance. The Qtilities::Core::Interfaces::IObjectManager::factoryReference() function takes this tag
               as a parameter. Make sure the factory you want to use is registered in the object manager under this tag name.
@@ -110,12 +112,12 @@ namespace Qtilities {
               In the case of InstanceFactoryInfo, this function will add the factory tag, instance tag etc. as
               attributes on \p object_node.
               */
-            virtual bool exportXml(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) const;
+            virtual bool exportXml(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const;
             /*!
               \note If \p object_node does not have an \p FactoryTag attribute associated with it,
               the %Qtilities factory tag is used by default.
               */
-            virtual bool importXml(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version);
+            virtual bool importXml(QXmlStreamReader* doc, Qtilities::ExportVersion version);
 
             //! The name of the factory which must be used to create the instance.
             QString d_factory_tag;

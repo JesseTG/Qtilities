@@ -17,6 +17,9 @@
 #include "Factory.h"
 #include "QtilitiesCoreConstants.h"
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace Core {
         using namespace Qtilities::Core::Interfaces;
@@ -245,8 +248,8 @@ ActivityPolicyFilter* activity_filter = tree_node->enableActivityControl(Observe
             InstanceFactoryInfo instanceFactoryInfo() const;
             IExportable::ExportResultFlags exportBinary(QDataStream& stream) const;
             IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             // --------------------------------
             // IObjectBase Implementation

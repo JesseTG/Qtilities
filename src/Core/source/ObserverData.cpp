@@ -19,7 +19,8 @@
 #include <stdio.h>
 #include <time.h>
 
-#include <QDomElement>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
 using namespace Qtilities::Core::Interfaces;
 
@@ -136,7 +137,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     return IExportable::Incomplete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportXml(QXmlStreamWriter* doc) const {
     #ifdef QTILITIES_BENCHMARKING
     time_t start,end;
     time(&start);
@@ -147,7 +148,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
         return version_check_result;
 
     if (exportVersion() == Qtilities::Qtilities_1_0 || exportVersion() == Qtilities::Qtilities_1_1 || exportVersion() == Qtilities::Qtilities_1_2) {
-        IExportable::ExportResultFlags result = exportXmlExt_1_0(doc,object_node,ExportData);
+        IExportable::ExportResultFlags result = exportXmlExt_1_0(doc,ExportData);
         #ifdef QTILITIES_BENCHMARKING
         time(&end);
         double diff = difftime(end,start);
@@ -159,7 +160,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     return IExportable::Incomplete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     #ifdef QTILITIES_BENCHMARKING
     time_t start,end;
     time(&start);
@@ -170,7 +171,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
         return version_check_result;
 
     if (exportVersion() == Qtilities::Qtilities_1_0 || exportVersion() == Qtilities::Qtilities_1_1 || exportVersion() == Qtilities::Qtilities_1_2) {
-        IExportable::ExportResultFlags result = importXmlExt_1_0(doc,object_node,import_list);
+        IExportable::ExportResultFlags result = importXmlExt_1_0(doc,import_list);
         #ifdef QTILITIES_BENCHMARKING
         time(&end);
         double diff = difftime(end,start);
@@ -193,13 +194,13 @@ IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportBinaryExt(QD
     return IExportable::Incomplete;
 }
 
-IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportXmlExt(QDomDocument* doc, QDomElement* object_node, ExportItemFlags export_flags) const {
+IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportXmlExt(QXmlStreamWriter* doc, ExportItemFlags export_flags) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
     if (exportVersion() == Qtilities::Qtilities_1_0 || exportVersion() == Qtilities::Qtilities_1_1 || exportVersion() == Qtilities::Qtilities_1_2)
-        return exportXmlExt_1_0(doc,object_node,export_flags);
+        return exportXmlExt_1_0(doc,export_flags);
 
     return IExportable::Incomplete;
 }
@@ -667,133 +668,60 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     }
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportXmlExt_1_0(QDomDocument* doc, QDomElement* object_node, ExportItemFlags export_flags) const {
-    object_node->setAttribute("ExportFlags",QString::number(export_flags));
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::exportXmlExt_1_0(QXmlStreamWriter* doc, ExportItemFlags export_flags) const {
+    doc->writeAttribute("ExportFlags",QString::number(export_flags));
 
     IExportable::ExportResultFlags result = IExportable::Complete;
     bool complete = true;
 
+    // Visitor ID (only when needed)
+    if (export_flags & (ExportVisitorIDs | ExportData)) {
+        int visitor_id = -1;
+        if (ObjectManager::propertyExists(observer,qti_prop_VISITOR_ID)) {
+            QVariant prop_variant = observer->property(qti_prop_VISITOR_ID);
+            if (prop_variant.isValid() && prop_variant.canConvert<SharedProperty>()) {
+                SharedProperty prop = prop_variant.value<SharedProperty>();
+                if (prop.isValid()) {
+                     visitor_id = prop.value().toInt();
+                }
+            }
+        }
+        doc->writeAttribute("VisitorID",QString::number(visitor_id));
+    }
+
     ObserverRelationalTable* relational_table = 0;
     if (export_flags & ExportRelationalData) {
-        QDomElement relational_data = doc->createElement("RelationalData");
-        object_node->appendChild(relational_data);
+        doc->writeStartElement("RelationalData");
+
         // Export relational data about the observer:
         relational_table = new ObserverRelationalTable(observer,true);
         relational_table->setExportVersion(exportVersion());
         relational_table->setExportTask(exportTask());
-        if (relational_table->exportXml(doc,&relational_data) != IExportable::Complete) {
-            if (relational_table)
-                delete relational_table;
+        if (relational_table->exportXml(doc) != IExportable::Complete) {
+            delete relational_table;
             return IExportable::Failed;
         }
         relational_table->clearExportTask();
+        doc->writeEndElement();
     }
 
     if (export_flags & ExportData) {
-        // 1. The data of this item is added to a new data node:
-        QDomElement subject_data = doc->createElement("Data");
-
-        // Observer data:
-        QDomElement observer_data = doc->createElement("ObserverData");
-        // Add parameters as attributes:
-        if (subject_limit != -1)
-            observer_data.setAttribute("SubjectLimit",subject_limit);
-        if (!observer_description.isEmpty())
-            observer_data.setAttribute("Description",observer_description);
-        if (access_mode != Observer::FullAccess)
-            observer_data.setAttribute("AccessMode",Observer::accessModeToString((Observer::AccessMode) access_mode));        
-        if (access_mode != Observer::GlobalScope)
-            observer_data.setAttribute("AccessModeScope",Observer::accessModeScopeToString((Observer::AccessModeScope) access_mode_scope));
-        if (object_deletion_policy != Observer::DeleteImmediately)
-            observer_data.setAttribute("ObjectDeletionPolicy",Observer::objectDeletionPolicyToString((Observer::ObjectDeletionPolicy) object_deletion_policy));
-
-        // Check there are any attributes under observer data:
-        if (observer_data.attributes().count() > 0 || observer_data.childNodes().count() > 0)
-            subject_data.appendChild(observer_data);
-
-        // Visitor ID (only when needed)
-        if (export_flags & ExportVisitorIDs) {
-            int visitor_id = -1;
-            if (ObjectManager::propertyExists(observer,qti_prop_VISITOR_ID)) {
-                QVariant prop_variant = observer->property(qti_prop_VISITOR_ID);
-                if (prop_variant.isValid() && prop_variant.canConvert<SharedProperty>()) {
-                    SharedProperty prop = prop_variant.value<SharedProperty>();
-                    if (prop.isValid()) {
-                         visitor_id = prop.value().toInt();
-                    }
-                }
-            }
-            object_node->setAttribute("VisitorID",visitor_id);
-        }
-
         // Categories:
         if (categories.count() > 0) {
-            QDomElement categories_node = doc->createElement("Categories");
-            object_node->appendChild(categories_node);
+            doc->writeStartElement("Categories");
             for (int i = 0; i < categories.count(); ++i) {
-                QDomElement category = doc->createElement("Category");
-                categories_node.appendChild(category);
-                categories.at(i).exportXml(doc,&category);
+                doc->writeStartElement("Category");
+                categories.at(i).exportXml(doc);
+                doc->writeEndElement();
             }
+            doc->writeEndElement();
         }
-
-        // Observer hints:
-        if (display_hints) {
-            if (display_hints->isExportable()) {
-                QDomElement hints_data = doc->createElement("ObserverHints");
-                display_hints->setExportVersion(exportVersion());
-                display_hints->setExportTask(exportTask());
-                if (display_hints->exportXml(doc,&hints_data) == IExportable::Failed) {
-                    if (relational_table)
-                        delete relational_table;
-                    display_hints->clearExportTask();
-                    return IExportable::Failed;
-                }
-                display_hints->clearExportTask();
-                if (hints_data.attributes().count() > 0 || hints_data.childNodes().count() > 0)
-                    subject_data.appendChild(hints_data);
-            }
-        }
-
-        // Subject filters:
-        for (int i = 0; i < subject_filters.count(); ++i) {
-            if (subject_filters.at(i)->isExportable()) {
-                QDomElement subject_filter = doc->createElement("SubjectFilter");
-                subject_data.appendChild(subject_filter);
-                if (!subject_filters.at(i)->instanceFactoryInfo().exportXml(doc,&subject_filter,exportVersion())) {
-                    if (relational_table)
-                        delete relational_table;
-                    return IExportable::Failed;
-                }
-                subject_filters.at(i)->setExportVersion(exportVersion());
-                subject_filters.at(i)->setExportTask(exportTask());
-                if (subject_filters.at(i)->exportXml(doc,&subject_filter) == IExportable::Failed) {
-                    if (relational_table)
-                        delete relational_table;
-                    subject_filters.at(i)->clearExportTask();
-                    return IExportable::Failed;
-                }
-                subject_filters.at(i)->clearExportTask();
-            }
-        }
-
-        // Formatting:
-        IExportableFormatting* formatting_iface = qobject_cast<IExportableFormatting*> (objectBase());
-        if (formatting_iface) {
-            if (formatting_iface->exportFormattingXML(doc,&subject_data,exportVersion()) == IExportable::Failed) {
-                if (relational_table)
-                    delete relational_table;
-                return IExportable::Failed;
-            }
-        }
-
-        if (subject_data.attributes().count() > 0 || subject_data.childNodes().count() > 0)
-            object_node->appendChild(subject_data);
 
         // Make List Of Exportable Subjects
         QList<IExportable*> exportable_list;
-        if (export_flags & ExportVisitorIDs)
+        if (export_flags & ExportVisitorIDs) {
             exportable_list = getLimitedExportsList(subject_list.toQList(),IExportable::XML,&complete);
+        }
         else {
             for (int l = 0; l < subject_list.count(); l++) {
                 IExportable* iface = qobject_cast<IExportable*> (subject_list.at(l));
@@ -810,9 +738,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
         }
 
         // Export exportable subjects:
-        QDomElement subject_children = doc->createElement("Children");
-        if (exportable_list.count() > 0)
-            object_node->appendChild(subject_children);
+        doc->writeStartElement("Children");
         for (int i = 0; i < exportable_list.count(); ++i) {
             Observer* obs = qobject_cast<Observer*> (exportable_list.at(i)->objectBase());
             IExportable* export_iface = exportable_list.at(i);
@@ -820,43 +746,36 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                 if (export_iface->supportedFormats() & IExportable::XML) {
                     // Create a data item with its factory data as attributes for i:
                     // The item and its factory data:
-                    QDomElement subject_item = doc->createElement("TreeItem");
-                    subject_children.appendChild(subject_item);
+                    doc->writeStartElement("TreeItem");
+
                     // We also append the following information:
-                    // 1. Category:
+                    // 1. Is Active:
+                    if (ObjectManager::propertyExists(export_iface->objectBase(),qti_prop_ACTIVITY_MAP)) {
+                        bool activity = observer->getMultiContextPropertyValue(export_iface->objectBase(),qti_prop_ACTIVITY_MAP).toBool();
+
+                        doc->writeAttribute("Activity",activity ? "Active" : "Inactive");
+                    }
+
+                    // 2. Ownership:
+                    Observer::ObjectOwnership ownership = observer->subjectOwnershipInContext(export_iface->objectBase());
+                    if (ownership != Observer::ObserverScopeOwnership)
+                        doc->writeAttribute("Ownership",Observer::objectOwnershipToString(ownership));
+
+                    // 3. Category:
                     if (ObjectManager::propertyExists(export_iface->objectBase(),qti_prop_CATEGORY_MAP)) {
                         QVariant category_variant = observer->getMultiContextPropertyValue(export_iface->objectBase(),qti_prop_CATEGORY_MAP);
                         if (category_variant.isValid()) {
                             QtilitiesCategory category = category_variant.value<QtilitiesCategory>();
-                            QDomElement category_item = doc->createElement("Category");
-                            subject_item.appendChild(category_item);
+                            doc->writeStartElement("Category");
                             category.setExportVersion(exportVersion());
                             category.setExportTask(exportTask());
-                            category.exportXml(doc,&category_item);
+                            category.exportXml(doc);
                             category.clearExportTask();
+                            doc->writeEndElement();
                         }
                     }
-                    // 2. Is Active:
-                    if (ObjectManager::propertyExists(export_iface->objectBase(),qti_prop_ACTIVITY_MAP)) {
-                        bool activity = observer->getMultiContextPropertyValue(export_iface->objectBase(),qti_prop_ACTIVITY_MAP).toBool();
-                        if (activity)
-                            subject_item.setAttribute("Activity","Active");
-                        else
-                            subject_item.setAttribute("Activity","Inactive");
-                    }
-                    // 3. Ownership:
-                    Observer::ObjectOwnership ownership = observer->subjectOwnershipInContext(export_iface->objectBase());
-                    if (ownership != Observer::ObserverScopeOwnership)
-                        subject_item.setAttribute("Ownership",Observer::objectOwnershipToString(ownership));
 
-                    // 4. Factory Data:
-                    if (!export_iface->instanceFactoryInfo().exportXml(doc,&subject_item,exportVersion())) {
-                        if (relational_table)
-                            delete relational_table;
-                        return IExportable::Failed;
-                    }
-
-                    // 5. Visitor ID (only when needed)
+                    // 4. Visitor ID (only when needed)
                     if (export_flags & ExportVisitorIDs) {
                         int visitor_id = -1;
                         if (ObjectManager::propertyExists(export_iface->objectBase(),qti_prop_VISITOR_ID)) {
@@ -868,8 +787,16 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                 }
                             }
                         }
-                        subject_item.setAttribute("VisitorID",visitor_id);
+                        doc->writeAttribute("VisitorID",QString::number(visitor_id));
                     }
+
+                    // 5. Factory Data:
+                    if (!export_iface->instanceFactoryInfo().exportXml(doc,exportVersion())) {
+                        if (relational_table)
+                            delete relational_table;
+                        return IExportable::Failed;
+                    }
+
 
                     // Now we let the export iface export whatever it need to export:
                     export_iface->setExportVersion(exportVersion());
@@ -884,10 +811,10 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
 
                         // Must create new IObserverExportable interface to handle this situation.
                         obs->setExportTask(exportTask());
-                        intermediate_result = export_iface_obs->exportXmlExt(doc,&subject_item,child_obs_flags);
+                        intermediate_result = export_iface_obs->exportXmlExt(doc,child_obs_flags);
                     } else {
                         export_iface->setExportTask(exportTask());
-                        intermediate_result = export_iface->exportXml(doc,&subject_item);
+                        intermediate_result = export_iface->exportXml(doc);
                     }
 
                     export_iface->clearExportTask();
@@ -903,12 +830,82 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                     } else if (intermediate_result == IExportable::Complete) {
                         LOG_TASK_TRACE("TreeItem (" + export_iface->objectBase()->objectName() + ") is complete.",exportTask());
                     }
+                    doc->writeEndElement();
                 } else {
                     LOG_TASK_WARNING("XML export found an interface (" + observer->subjectNameInContext(export_iface->objectBase()) + " in context " + observer->observerName() + ") which does not support XML exporting. XML export will be incomplete.",exportTask());
                     result = IExportable::Incomplete;
                 }
             }
         }
+        doc->writeEndElement();
+
+        // The data of this item is added to a new data node:
+        doc->writeStartElement("Data");
+
+        // Observer data:
+        doc->writeEmptyElement("ObserverData");
+        // Add parameters as attributes:
+        if (subject_limit != -1)
+            doc->writeAttribute("SubjectLimit",QString::number(subject_limit));
+        if (!observer_description.isEmpty())
+            doc->writeAttribute("Description",observer_description);
+        if (access_mode != Observer::FullAccess)
+            doc->writeAttribute("AccessMode",Observer::accessModeToString((Observer::AccessMode) access_mode));
+        if (access_mode != Observer::GlobalScope)
+            doc->writeAttribute("AccessModeScope",Observer::accessModeScopeToString((Observer::AccessModeScope) access_mode_scope));
+        if (object_deletion_policy != Observer::DeleteImmediately)
+            doc->writeAttribute("ObjectDeletionPolicy",Observer::objectDeletionPolicyToString((Observer::ObjectDeletionPolicy) object_deletion_policy));
+
+        // Observer hints:
+        if (display_hints) {
+            if (display_hints->isExportable()) {
+                doc->writeStartElement("ObserverHints");
+                display_hints->setExportVersion(exportVersion());
+                display_hints->setExportTask(exportTask());
+                if (display_hints->exportXml(doc) == IExportable::Failed) {
+                    if (relational_table)
+                        delete relational_table;
+                    display_hints->clearExportTask();
+                    return IExportable::Failed;
+                }
+                display_hints->clearExportTask();
+                doc->writeEndElement();
+            }
+        }
+
+        // Subject filters:
+        for (int i = 0; i < subject_filters.count(); ++i) {
+            if (subject_filters.at(i)->isExportable()) {
+                doc->writeStartElement("SubjectFilter");
+                if (!subject_filters.at(i)->instanceFactoryInfo().exportXml(doc,exportVersion())) {
+                    if (relational_table)
+                        delete relational_table;
+                    return IExportable::Failed;
+                }
+                subject_filters.at(i)->setExportVersion(exportVersion());
+                subject_filters.at(i)->setExportTask(exportTask());
+                if (subject_filters.at(i)->exportXml(doc) == IExportable::Failed) {
+                    if (relational_table)
+                        delete relational_table;
+                    subject_filters.at(i)->clearExportTask();
+                    return IExportable::Failed;
+                }
+                subject_filters.at(i)->clearExportTask();
+                doc->writeEndElement();
+            }
+        }
+
+        // Formatting:
+        IExportableFormatting* formatting_iface = qobject_cast<IExportableFormatting*> (objectBase());
+        if (formatting_iface) {
+            if (formatting_iface->exportFormattingXML(doc,exportVersion()) == IExportable::Failed) {
+                if (relational_table)
+                    delete relational_table;
+                return IExportable::Failed;
+            }
+        }
+
+        doc->writeEndElement();
     }
 
     if (relational_table)
@@ -928,7 +925,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     }
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::importXmlExt_1_0(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverData::importXmlExt_1_0(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     QList<QPointer<QObject> > active_subjects;
     observer->startProcessingCycle();
     IExportable::ExportResultFlags result = IExportable::Complete;
@@ -939,112 +936,86 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     QList<QPointer<QObject> > internal_import_list;
 
     ExportItemFlags export_flags = ExportData;
-    if (object_node->hasAttribute("ExportFlags"))
-        export_flags = (ExportItemFlags) object_node->attribute("ExportFlags").toInt();
+    QXmlStreamAttributes objectAttributes = doc->attributes();
+
+    if (objectAttributes.hasAttribute("ExportFlags"))
+        export_flags = (ExportItemFlags) objectAttributes.value("ExportFlags").toInt();
 
     if (export_flags & ExportVisitorIDs) {
-        if (object_node->hasAttribute("VisitorID")) {
-            SharedProperty visitor_id_prop(qti_prop_VISITOR_ID,object_node->attribute("VisitorID").toInt());
+        if (objectAttributes.hasAttribute("VisitorID")) {
+            SharedProperty visitor_id_prop(qti_prop_VISITOR_ID,objectAttributes.value("VisitorID").toInt());
             ObjectManager::setSharedProperty(observer,visitor_id_prop);
         }
     }
 
     // All children underneath the root element gets constructed in here:
     QList<QObject*> constructed_list;
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
-
-        if (child.isNull())
-            continue;
+    while (doc->readNextStartElement()) {
+        QString tagName = doc->name().toString();
 
         if (export_flags & ExportRelationalData) {
-            if (child.tagName() == QLatin1String("RelationalData")) {
+            if (tagName == "RelationalData") {
                 readback_table = new ObserverRelationalTable;
                 QList<QPointer<QObject> > tmp_import_list;
                 readback_table->setExportTask(exportTask());
-                readback_table->importXml(doc,&child,tmp_import_list);
+                readback_table->importXml(doc,tmp_import_list);
                 readback_table->clearExportTask();
             }
         }
 
         if (export_flags & ExportData) {
-            if (child.tagName() == QLatin1String("Data")) {
-                QDomNodeList dataNodes = child.childNodes();
-                for(int i = 0; i < dataNodes.count(); ++i)
-                {
-                    QDomNode dataChildNode = dataNodes.item(i);
-                    QDomElement dataChild = dataChildNode.toElement();
+            if (tagName == "Data") {
+                while (doc->readNextStartElement()) {
+                    QString childNodeName = doc->name().toString();
 
-                    if (dataChild.isNull())
-                        continue;
-
-                    if (dataChild.tagName() == QLatin1String("ObserverHints")) {
+                    if (childNodeName == "ObserverHints") {
                         observer->useDisplayHints();
                         display_hints->setExportVersion(exportVersion());
                         display_hints->setExportTask(exportTask());
-                        if (display_hints->importXml(doc,&dataChild,import_list) == IExportable::Failed) {
+                        if (display_hints->importXml(doc,import_list) == IExportable::Failed) {
                             display_hints->clearExportTask();
                             return IExportable::Failed;
                         }
                         display_hints->clearExportTask();
-                        continue;
                     }
+                    else if (childNodeName == "ObserverData") {
+                        QXmlStreamAttributes childNodeAttr = doc->attributes();
 
-                    if (dataChild.tagName() == QLatin1String("ObserverData")) {
-                        if (dataChild.hasAttribute("SubjectLimit"))
-                            subject_limit = dataChild.attribute("SubjectLimit").toInt();
-                        if (dataChild.hasAttribute("Description"))
-                            observer_description = dataChild.attribute("Description");
-                        if (dataChild.hasAttribute("AccessMode"))
-                            access_mode = Observer::stringToAccessMode(dataChild.attribute("AccessMode"));
-                        if (dataChild.hasAttribute("AccessModeScope"))
-                            access_mode_scope = Observer::stringToAccessModeScope(dataChild.attribute("AccessModeScope"));
-                        if (dataChild.hasAttribute("ObjectDeletionPolicy"))
-                            object_deletion_policy = Observer::stringToObjectDeletionPolicy(dataChild.attribute("ObjectDeletionPolicy"));
+                        if (childNodeAttr.hasAttribute("SubjectLimit"))
+                            subject_limit = childNodeAttr.value("SubjectLimit").toInt();
+                        if (childNodeAttr.hasAttribute("Description"))
+                            observer_description = childNodeAttr.value("Description").toString();
+                        if (childNodeAttr.hasAttribute("AccessMode"))
+                            access_mode = Observer::stringToAccessMode(childNodeAttr.value("AccessMode").toString());
+                        if (childNodeAttr.hasAttribute("AccessModeScope"))
+                            access_mode_scope = Observer::stringToAccessModeScope(childNodeAttr.value("AccessModeScope").toString());
+                        if (childNodeAttr.hasAttribute("ObjectDeletionPolicy"))
+                            object_deletion_policy = Observer::stringToObjectDeletionPolicy(childNodeAttr.value("ObjectDeletionPolicy").toString());
 
                         // Category stuff:
-                        QDomNodeList childNodes = dataChild.childNodes();
-                        for(int i = 0; i < childNodes.count(); ++i)
-                        {
-                            QDomNode childNode = childNodes.item(i);
-                            QDomElement child = childNode.toElement();
+                        while (doc->readNextStartElement()) {
+                            QString childName2 = doc->name().toString();
 
-                            if (child.isNull())
-                                continue;
+                            if (childName2 == "Categories") {
+                                while (doc->readNextStartElement()) {
+                                    QString categoryName = doc->name().toString();
 
-                            if (child.tagName() == QLatin1String("Categories")) {
-                                QDomNodeList categoryNodes = child.childNodes();
-                                for(int i = 0; i < categoryNodes.count(); ++i)
-                                {
-                                    QDomNode categoryNode = categoryNodes.item(i);
-                                    QDomElement category = categoryNode.toElement();
-
-                                    if (category.isNull())
-                                        continue;
-
-                                    if (category.tagName() == QLatin1String("Categories")) {
+                                    if (categoryName == "Category") {
                                         QtilitiesCategory new_category;
                                         new_category.setExportVersion(exportVersion());
                                         new_category.setExportTask(exportTask());
-                                        new_category.importXml(doc,&category,import_list);
+                                        new_category.importXml(doc,import_list);
                                         if (new_category.isValid())
                                             categories << new_category;
                                         new_category.clearExportTask();
-                                        continue;
                                     }
                                 }
-                                continue;
                             }
                         }
-                        continue;
                     }
-
-                    if (dataChild.tagName() == QLatin1String("SubjectFilter")) {
+                    else if (childNodeName == "SubjectFilter") {
                         // Construct and init the subject filter:
-                        InstanceFactoryInfo instanceFactoryInfo(doc,&dataChild,exportVersion());
+                        InstanceFactoryInfo instanceFactoryInfo(doc,exportVersion());
                         if (instanceFactoryInfo.isValid()) {
                             LOG_TASK_TRACE(QString("Importing subject type \"%1\" in factory \"%2\"...").arg(instanceFactoryInfo.d_instance_tag).arg(instanceFactoryInfo.d_factory_tag),exportTask());
 
@@ -1057,7 +1028,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                     if (abstract_filter) {
                                         abstract_filter->setExportVersion(exportVersion());
                                         abstract_filter->setExportTask(exportTask());
-                                        if (abstract_filter->importXml(doc,&dataChild,import_list) == IExportable::Failed) {
+                                        if (abstract_filter->importXml(doc,import_list) == IExportable::Failed) {
                                             LOG_TASK_ERROR(QString("Failed to import subject filter \"%1\" for tree node: \"%2\". Importing will not continue.").arg(instanceFactoryInfo.d_instance_tag).arg(observer->observerName()),exportTask());
                                             delete abstract_filter;
                                             result = IExportable::Failed;
@@ -1070,38 +1041,30 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                     }
                                 }
                             }
-                        } else
+                        } else {
                             LOG_TASK_WARNING(QString("Found invalid factory data for subject filter on tree node: %1").arg(observer->observerName()),exportTask());
-                        continue;
+                        }
                     }
-
-                    if (dataChild.tagName() == QLatin1String("Formatting")) {
+                    else if (childNodeName == "Formatting") {
                         IExportableFormatting* formatting_iface = qobject_cast<IExportableFormatting*> (observer->objectBase());
                         if (formatting_iface) {
-                            if (formatting_iface->importFormattingXML(doc,&dataChild,exportVersion()) != IExportable::Complete) {
+                            if (formatting_iface->importFormattingXML(doc,exportVersion()) != IExportable::Complete) {
                                 LOG_TASK_WARNING(QString("Failed to import formatting for tree node: \"%1\"").arg(observer->observerName()),exportTask());
                                 result = IExportable::Incomplete;
                             }
                         }
-                        continue;
                     }
                 }
-                continue;
             }
+            else if (tagName == "Children") {
+                while (doc->readNextStartElement()) {
+                    QString childNode3 = doc->name().toString();
 
-            if (child.tagName() == QLatin1String("Children")) {
-                QDomNodeList childrenNodes = child.childNodes();
-                for(int i = 0; i < childrenNodes.count(); ++i)
-                {
-                    QDomNode childrenChildNode = childrenNodes.item(i);
-                    QDomElement childrenChild = childrenChildNode.toElement();
+                    if (childNode3 == "TreeItem") {
+                        QXmlStreamAttributes childAttr3 = doc->attributes();
 
-                    if (childrenChild.isNull())
-                        continue;
-
-                    if (childrenChild.tagName() == QLatin1String("TreeItem")) {
                         // Construct and init the child:
-                        InstanceFactoryInfo instanceFactoryInfo(doc,&childrenChild,exportVersion());
+                        InstanceFactoryInfo instanceFactoryInfo(doc,exportVersion());
                         if (instanceFactoryInfo.isValid()) {
                             LOG_TASK_TRACE(QString("Importing subject type \"%1\" in factory \"%2\"...").arg(instanceFactoryInfo.d_instance_tag).arg(instanceFactoryInfo.d_factory_tag),exportTask());
 
@@ -1117,8 +1080,8 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                         constructed_list << iface->objectBase();
                                         // Check if we must restore the ownership is active:
                                         Observer::ObjectOwnership ownership = Observer::ObserverScopeOwnership;
-                                        if (childrenChild.hasAttribute("Ownership")) {
-                                            ownership = Observer::stringToObjectOwnership(childrenChild.attribute("Ownership"));
+                                        if (childAttr3.hasAttribute("Ownership")) {
+                                            ownership = Observer::stringToObjectOwnership(childAttr3.value("Ownership").toString());
                                         }
                                         QString error_msg;
                                         if (observer->attachSubject(iface->objectBase(),ownership,&error_msg)) {
@@ -1130,21 +1093,15 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                             continue;
                                         }
 
-                                        QDomNodeList subjectChildNodes = childrenChild.childNodes();
-                                        for(int i = 0; i < subjectChildNodes.count(); ++i)
-                                        {
-                                            QDomNode subjectChildNode = subjectChildNodes.item(i);
-                                            QDomElement subjectChild = subjectChildNode.toElement();
+                                        while (doc->readNextStartElement()) {
+                                            QString ffs = doc->name().toString();
 
-                                            if (subjectChild.isNull())
-                                                continue;
-
-                                            if (subjectChild.tagName() == QLatin1String("Category")) {
+                                            if (ffs == "Category") {
                                                 // We just created this object, it will not have a category property yet so no need to check if it needs one:
                                                 QtilitiesCategory category;
                                                 category.setExportVersion(exportVersion());
                                                 category.setExportTask(exportTask());
-                                                IExportable::ExportResultFlags category_result = category.importXml(doc,&subjectChild,import_list);
+                                                IExportable::ExportResultFlags category_result = category.importXml(doc,import_list);
                                                 category.clearExportTask();
 
                                                 if (category_result == IExportable::Incomplete) {
@@ -1174,9 +1131,9 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                         IExportable::ExportResultFlags intermediate_result;
 
                                         if (obs)
-                                            intermediate_result = iface->importXml(doc,&childrenChild,internal_import_list);
+                                            intermediate_result = iface->importXml(doc,internal_import_list);
                                         else
-                                            intermediate_result = iface->importXml(doc,&childrenChild,import_list);
+                                            intermediate_result = iface->importXml(doc,import_list);
 
                                         if (intermediate_result == IExportable::Incomplete) {
                                             LOG_TASK_WARNING(QString("Failed to reconstruct object completely in tree node: %1. Item \"%2\" will be incomplete.").arg(observer->observerName()).arg(iface->objectBase()->objectName()),exportTask());
@@ -1187,15 +1144,15 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                                         }
 
                                         // Check if it is active:
-                                        if (childrenChild.hasAttribute("Activity")) {
-                                            if (childrenChild.attribute("Activity") == QString("Active"))
+                                        if (childAttr3.hasAttribute("Activity")) {
+                                            if (childAttr3.value("Activity") == "Active")
                                                 active_subjects << iface->objectBase();
                                         }
 
                                         // Get VisitorID if needed:
                                         if (export_flags & ExportVisitorIDs) {
-                                            if (childrenChild.hasAttribute("VisitorID")) {
-                                                SharedProperty visitor_id_prop(qti_prop_VISITOR_ID,childrenChild.attribute("VisitorID").toInt());
+                                            if (childAttr3.hasAttribute("VisitorID")) {
+                                                SharedProperty visitor_id_prop(qti_prop_VISITOR_ID,childAttr3.value("VisitorID").toInt());
                                                 ObjectManager::setSharedProperty(iface->objectBase(),visitor_id_prop);
                                             }
                                         }
@@ -1220,10 +1177,9 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
                         }
                         continue;
                     }
+                    }
                 }
-                continue;
-            }
-        }
+          }
     }
 
     if (export_flags & ExportRelationalData) {

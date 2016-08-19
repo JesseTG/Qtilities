@@ -24,8 +24,8 @@
 #include <QPointer>
 #include <QString>
 
-class QDomDocument;
-class QDomElement;
+class QXmlStreamReader;
+class QXmlStreamWriter;
 
 namespace Qtilities {
     namespace Core {
@@ -39,7 +39,7 @@ namespace Qtilities {
 
             IExportable is an interface used throughout %Qtilities by classes in order to stream their data. At present two export options are supported:
             - Serialized binary streaming
-            - QDomDocument construction
+            - XML document construction
 
             Any object that implements this interface can specify which of the above export formats it supports through the supportedFormats() function. The interface also allows you to provide the needed information about reconstructing your object through the instanceFactoryInfo() function. In short, this allows your object to specify the factory that should be used to reconstruct it as well as the factory tag to use in that factory. For a detailed overview of the factory architecture used in %Qtilities, please refer to \ref page_factories.
 
@@ -55,7 +55,7 @@ namespace Qtilities {
 
             \section iexportable_xml XML Exporting
 
-            XML exports allow you to build up an XML QDomDocument with information about a set of objects and is performed through the exportXml() and importXml() functions. These both provides you with a reference to the QDomDocument which allows you to create a new QDomElements. A QDomElement which represents your object is also provided. This allows you to easily construct new QDomElements and attach them to your objects node.
+            XML exports allow you to build up an XML document with information about a set of objects and is performed through the exportXml() and importXml() functions. These both provides you with a reference to a QXmlStreamWriter and a QXmlStreamReader as appropriate.
 
             See the \ref iexportable_comparison section of this page for a comparison between Binary and XML exports.
 
@@ -126,25 +126,24 @@ int main(int argc, char *argv[])
             Here only the export and import functions will be shown. First, the export function which shows how the function handles different application versions.
 
 \code
-IExportable::ExportResultFlags VersionDetails::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+IExportable::ExportResultFlags VersionDetails::exportXml(QXmlStreamWriter* doc) const {
     if (applicationExportVersion() < 0)
         return IExportable::VersionTooOld;
     if (applicationExportVersion() > 2)
         return IExportable::VersionTooNew;
 
     // Create a simple node and add our information to it:
-    QDomElement revision_data = doc->createElement("RevisionInfo");
-    object_node->appendChild(revision_data);
+    doc->writeEmptyElement("RevisionInfo");
 
     // Information in both version 0 and version 1 of our class:
-    revision_data.setAttribute("DescriptionBrief",d->description_brief);
-    revision_data.setAttribute("DescriptionDetailed",d->description_detailed);
-    revision_data.setAttribute("Minor",d->version_minor);
-    revision_data.setAttribute("Major",d->version_major);
+    doc->writeAttribute("DescriptionBrief",d->description_brief);
+    doc->writeAttribute("DescriptionDetailed",d->description_detailed);
+    doc->writeAttribute("Minor",QString::number(d->version_minor));
+    doc->writeAttribute("Major",QString::number(d->version_major));
 
     // Lets say we add a new parameter in the next version of the class:
     if (applicationExportVersion() == 1)
-        revision_data.setAttribute("NewAttribute",d->new_attribute_storage);
+        doc->writeAttribute("NewAttribute",d->new_attribute_storage);
 
     return IExportable::Complete;
 }
@@ -153,8 +152,7 @@ IExportable::ExportResultFlags VersionDetails::exportXml(QDomDocument* doc, QDom
             And next the import function which checks the application export version again. In this case the version will be set to the version of the file that is parsed.
 
 \code
-IExportable::ExportResultFlags VersionDetails::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+IExportable::ExportResultFlags VersionDetails::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     if (applicationExportVersion() < 0)
@@ -168,26 +166,23 @@ IExportable::ExportResultFlags VersionDetails::importXml(QDomDocument* doc, QDom
 
     // Find our RevisionInfo element:
     IExportable::ExportResultFlags result = IExportable::Complete;
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); i++) {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
 
-        if (child.isNull())
-            continue;
+    while (doc->readNextStartElement() {
+        QStringRef child = doc->name();
 
-        if (child.tagName() == "RevisionInfo") {
-            if (child.hasAttribute("DescriptionBrief"))
-                d->description_brief = child.attribute("DescriptionBrief");
-            if (child.hasAttribute("DescriptionDetailed"))
-                d->description_detailed = child.attribute("DescriptionDetailed");
-            if (child.hasAttribute("Minor"))
-                d->version_minor = child.attribute("Minor").toInt();
-            if (child.hasAttribute("Major"))
-                d->version_major = child.attribute("Major").toInt();
-            if (child.hasAttribute("NewAttribute") && applicationExportVersion() == 1)
-                d->new_attribute_storage = child.attribute("NewAttribute");
-            continue;
+        if (child == "RevisionInfo") {
+            QXmlStreamAttributes attributes = doc->attributes();
+
+            if (attribute.hasAttribute("DescriptionBrief"))
+                d->description_brief = attribute.value("DescriptionBrief");
+            if (attribute.hasAttribute("DescriptionDetailed"))
+                d->description_detailed = attribute.value("DescriptionDetailed");
+            if (attribute.hasAttribute("Minor"))
+                d->version_minor = attribute.value("Minor").toInt();
+            if (attribute.hasAttribute("Major"))
+                d->version_major = attribute.value("Major").toInt();
+            if (attribute.hasAttribute("NewAttribute") && applicationExportVersion() == 1)
+                d->new_attribute_storage = attribute.value("NewAttribute");
         }
     }
 
@@ -275,7 +270,7 @@ int main(int argc, char *argv[])
                 enum ExportMode {
                     None = 0,      /*!< Does not support any export modes. */
                     Binary = 1,    /*!< Binary exporting using QDataStream. \sa exportBinary(), importBinary() */
-                    XML = 2        /*!< XML exporting using QDomDocument. \sa exportXml(), importXml() */
+                    XML = 2        /*!< XML exporting using QXmlReader/Writer. \sa exportXml(), importXml() */
                 };
                 Q_DECLARE_FLAGS(ExportModeFlags, ExportMode)
                 Q_FLAGS(ExportModeFlags)
@@ -344,7 +339,7 @@ int main(int argc, char *argv[])
                 //! Function which will create a duplicate (copy) of this object.
                 /*!
                   This function will create a duplicate of this object. This operation is perfomed as follows:
-                  - Stream the object to a QDomDocument using exportXml().
+                  - Stream the object to an XML document using exportXml().
                   - Create a new object using the information in instanceFactoryInfo().
                   - Call importXml() on the newly created object
                   - Return the new object casted to IExportable.
@@ -484,16 +479,16 @@ TreeNode* duplicated_node = IExportable::duplicateInstance<TreeNode>(&node);
                 //----------------------------
                 // XML Exporting
                 //----------------------------
-                //! Allows exporting to an XML document. A reference to the QDomElement to which the object's information must be added is provided, along with a reference to the QDomDocument.
+                //! Allows exporting to an XML document. A reference to the QXmlStreamWriter to which the object's information must be added is provided, and it is assumed to be ready to accept another element.
                 /*!
                     See \ref page_serializing_overview for more information about the expected output format.
                   */
-                virtual ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-                //! Allows importing and reconstruction of data from information provided in a XML document. A reference to the QDomElement which contains the object's information is provided, along with a reference to the QDomDocument.
+                virtual ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+                //! Allows importing and reconstruction of data from information provided in a XML document. A reference to the QXmlStreamReader which contains the object's information is provided, and the element containing information to be imported is assumed to be the next token.
                 /*!
                     See \ref page_serializing_overview for more information about the expected output format.
                   */
-                virtual ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+                virtual ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
                 //----------------------------
                 // Enum <-> String Functions

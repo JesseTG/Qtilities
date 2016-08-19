@@ -18,7 +18,6 @@
 
 #include <QVariant>
 #include <QCoreApplication>
-#include <QDomElement>
 
 using namespace Qtilities::Core::Properties;
 using namespace Qtilities::Core::Constants;
@@ -802,43 +801,41 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Act
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ActivityPolicyFilter::exportXml(QDomDocument* doc, QDomElement* object_node) const {
-    Q_UNUSED(doc)
-
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ActivityPolicyFilter::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    object_node->setAttribute("ActivityPolicy",activityPolicyToString(d->activity_policy));
-    object_node->setAttribute("MinimumActivityPolicy",minimumActivityPolicyToString(d->minimum_activity_policy));
-    object_node->setAttribute("NewSubjectActivityPolicy",newSubjectActivityPolicyToString(d->new_subject_activity_policy));
-    object_node->setAttribute("ParentTrackingPolicy",parentTrackingPolicyToString(d->parent_tracking_policy));
+    doc->writeAttribute("ActivityPolicy",activityPolicyToString(d->activity_policy));
+    doc->writeAttribute("MinimumActivityPolicy",minimumActivityPolicyToString(d->minimum_activity_policy));
+    doc->writeAttribute("NewSubjectActivityPolicy",newSubjectActivityPolicyToString(d->new_subject_activity_policy));
+    doc->writeAttribute("ParentTrackingPolicy",parentTrackingPolicyToString(d->parent_tracking_policy));
     if (!filter_is_modification_state_monitored)
-        object_node->setAttribute("IsModificationStateMonitored","false");
+        doc->writeAttribute("IsModificationStateMonitored","false");
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ActivityPolicyFilter::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ActivityPolicyFilter::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (object_node->hasAttribute("ActivityPolicy"))
-        d->activity_policy = stringToActivityPolicy(object_node->attribute("ActivityPolicy"));
-    if (object_node->hasAttribute("MinimumActivityPolicy"))
-        d->minimum_activity_policy = stringToMinimumActivityPolicy(object_node->attribute("MinimumActivityPolicy"));
-    if (object_node->hasAttribute("NewSubjectActivityPolicy"))
-        d->new_subject_activity_policy = stringToNewSubjectActivityPolicy(object_node->attribute("NewSubjectActivityPolicy"));
-    if (object_node->hasAttribute("ParentTrackingPolicy"))
-        d->parent_tracking_policy = stringToParentTrackingPolicy(object_node->attribute("ParentTrackingPolicy"));
-    if (object_node->hasAttribute("IsModificationStateMonitored")) {
-        if (object_node->attribute("IsModificationStateMonitored") == QLatin1String("true"))
-            filter_is_modification_state_monitored = true;
-        else
-            filter_is_modification_state_monitored = false;
+    QXmlStreamAttributes attributes = doc->attributes();
+
+    if (attributes.hasAttribute("ActivityPolicy"))
+        d->activity_policy = stringToActivityPolicy(attributes.value("ActivityPolicy").toString());
+    if (attributes.hasAttribute("MinimumActivityPolicy"))
+        d->minimum_activity_policy = stringToMinimumActivityPolicy(attributes.value("MinimumActivityPolicy").toString());
+    if (attributes.hasAttribute("NewSubjectActivityPolicy"))
+        d->new_subject_activity_policy = stringToNewSubjectActivityPolicy(attributes.value("NewSubjectActivityPolicy").toString());
+    if (attributes.hasAttribute("ParentTrackingPolicy"))
+        d->parent_tracking_policy = stringToParentTrackingPolicy(attributes.value("ParentTrackingPolicy").toString());
+    if (attributes.hasAttribute("IsModificationStateMonitored")) {
+        QStringRef isModificationStateMonitored = attributes.value("IsModificationStateMonitored");
+
+        filter_is_modification_state_monitored = (isModificationStateMonitored == "true" || isModificationStateMonitored == "True");
     }
 
     return IExportable::Complete;

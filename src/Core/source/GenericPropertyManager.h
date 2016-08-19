@@ -23,6 +23,9 @@
 #include <Observer>
 #include <GenericProperty>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace Core {
         using namespace Qtilities::Core;
@@ -186,33 +189,31 @@ namespace Qtilities {
               - Finally it will emit reloadPropertyBrowsersRequest() in order for property browsers to reload themselves.
               */
             virtual Qtilities::Core::Interfaces::IExportable::ExportResultFlags loadNewPropertiesFile(const QString& file_name, ITask* task_ref = 0);
-            //! Exports all properties which does not match their default state to the given QDomDocument.
+            //! Exports all properties which does not match their default state to the given QXmlStreamWriter.
             /*!
               \note This function excludes any properties with their category set to qti_def_GENERIC_PROPERTY_CATEGORY_INTERNAL.
               */
-            IExportable::ExportResultFlags exportManagerProperties(QDomDocument* doc,
-                                                                   QDomElement* object_node,
+            IExportable::ExportResultFlags exportManagerProperties(QXmlStreamWriter* doc,
                                                                    bool export_non_default = true,
                                                                    bool export_default = false,
                                                                    const QString &export_node_name = "generic_properties") const;
-            //! Imports all properties which does not match their default state from the given QDomDocument.
+            //! Imports all properties which does not match their default state from the given QXmlStreamReader.
             /*!
               This function should be called after loadDefaultProperties(). It will load all changed properties and change the
               matching properties in the default set of properties to matches the imported, changed properties.
 
               \note This function will not import any macros. Use importMacros() for that.
               */
-            IExportable::ExportResultFlags importManagerProperties(QDomDocument* doc,
-                                                                   QDomElement* object_node,
+            IExportable::ExportResultFlags importManagerProperties(QXmlStreamReader* doc,
                                                                    const QString &export_node_name = "generic_properties");
 
-            //! Exports all macros matching the given macro mode to the given QDomDocment.
-            IExportable::ExportResultFlags exportMacros(GenericProperty::MacroMode macro_mode,QDomDocument* doc, QDomElement* object_node);
-            //! Imports macros from given QDomDocument.
+            //! Exports all macros matching the given macro mode to the given QXmlStreamWriter.
+            IExportable::ExportResultFlags exportMacros(GenericProperty::MacroMode macro_mode,QXmlStreamWriter* doc);
+            //! Imports macros from given QXmlStreamReader.
             /*!
                 This function will automatically set the macros to macro mode to macro_mode.
             */
-            IExportable::ExportResultFlags importMacros(GenericProperty::MacroMode macro_mode, QDomDocument* doc, QDomElement* object_node);
+            IExportable::ExportResultFlags importMacros(GenericProperty::MacroMode macro_mode, QXmlStreamReader* doc);
             //! Returns a QHash with macro values. Keys = macro name, Values = macro value.
             QHash<QString,QString> macroValues(GenericProperty::MacroMode macro_mode = GenericProperty::MacrosAll);
             //! Returns a list with all macro properties.

@@ -28,8 +28,6 @@
 #include <QDynamicPropertyChangeEvent>
 #include <QCoreApplication>
 #include <QMutableListIterator>
-#include <QDomElement>
-#include <QDomDocument>
 
 using namespace Qtilities::Core::Constants;
 using namespace Qtilities::Core::Interfaces;
@@ -263,20 +261,20 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     return observerData->importBinary(stream,import_list);
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::exportXml(QDomDocument* doc, QDomElement* object_node) const {
-    return observerData->exportXml(doc,object_node);
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::exportXml(QXmlStreamWriter* doc) const {
+    return observerData->exportXml(doc);
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    return observerData->importXml(doc,object_node,import_list);
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
+    return observerData->importXml(doc,import_list);
 }
 
 Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::exportBinaryExt(QDataStream& stream, ObserverData::ExportItemFlags export_flags) const {
     return observerData->exportBinaryExt(stream,export_flags);
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::exportXmlExt(QDomDocument* doc, QDomElement* object_node, ObserverData::ExportItemFlags export_flags) const {
-    return observerData->exportXmlExt(doc,object_node,export_flags);
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Observer::exportXmlExt(QXmlStreamWriter* doc, ObserverData::ExportItemFlags export_flags) const {
+    return observerData->exportXmlExt(doc,export_flags);
 }
 
 bool Observer::setMonitorSubjectModificationState(QObject *obj, bool monitor) {

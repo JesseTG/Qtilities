@@ -20,7 +20,11 @@
 #include <QHash>
 #include <QtDebug>
 #include <QCoreApplication>
-#include <QDomDocument>
+
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
+#include <QXmlStreamAttributes>
+#include <QXmlStreamAttribute>
 
 using namespace Qtilities::Core::Interfaces;
 using namespace Qtilities::Core::Constants;
@@ -324,26 +328,27 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Fil
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::FileSetInfo::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::FileSetInfo::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    object_node->setAttribute("FileCount",d->files.count());
-    for (int i = 0; i < d->files.count(); ++i) {
-        QDomElement file = doc->createElement("File_" + QString::number(i));
-        file.setAttribute("FilePath",d->files.at(i).filePath());
-        if (!d->files.at(i).relativeToPath().isEmpty())
-            file.setAttribute("RelativeToPath",d->files.at(i).relativeToPath());
-        object_node->appendChild(file);
-    }
+    doc->writeAttribute("FileCount",QString::number(d->files.count()));
     if (d->files.count() > 0)
-        object_node->setAttribute("FileSetHash",QString::number(fileSetHash()));
+        doc->writeAttribute("FileSetHash",QString::number(fileSetHash()));
+
+    for (int i = 0; i < d->files.count(); ++i) {
+        doc->writeEmptyElement("File_" + QString::number(i));
+        doc->writeAttribute("FilePath",d->files.at(i).filePath());
+        if (!d->files.at(i).relativeToPath().isEmpty())
+            doc->writeAttribute("RelativeToPath",d->files.at(i).relativeToPath());
+
+    }
 
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::FileSetInfo::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::FileSetInfo::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(doc)
     Q_UNUSED(import_list)
 
@@ -354,24 +359,17 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Fil
     clear();
     int depth_readback = 0;
 
-    if (object_node->hasAttribute("FileSetHash"))
-        d->files_hash = object_node->attribute("FileSetHash").toInt();
+    QXmlStreamAttributes attributes = doc->attributes();
+    if (attributes.hasAttribute("FileSetHash"))
+        d->files_hash = attributes.value("FileSetHash").toInt();
 
-    if (object_node->hasAttribute("FileCount"))
-        depth_readback = object_node->attribute("FileCount").toInt();
+    if (attributes.hasAttribute("FileCount"))
+        depth_readback = attributes.value("FileCount").toInt();
 
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
-
-        if (child.isNull())
-            continue;
-
-        if (child.tagName().startsWith("File_")) {
-            addFile(QtilitiesFileInfo(child.attribute("FilePath"),child.attribute("RelativeToPath")));
-            continue;
+    while (doc->readNextStartElement()) {
+        if (doc->name().startsWith("File_")) {
+            QXmlStreamAttributes attributes = doc->attributes();
+            addFile(QtilitiesFileInfo(attributes.value("FilePath").toString(),attributes.value("RelativeToPath").toString()));
         }
     }
 

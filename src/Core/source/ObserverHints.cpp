@@ -11,8 +11,6 @@
 
 #include "ObserverHints.h"
 
-#include <QDomElement>
-
 struct Qtilities::Core::ObserverHintsPrivateData {
     ObserverHintsPrivateData() : observer_selection_context(ObserverHints::SelectionUseParentContext),
         naming_control(ObserverHints::NoNamingControlHint),
@@ -762,41 +760,51 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverHints::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverHints::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
     // Export hints:
     if (d->action_hints != ActionNoHints)
-        object_node->setAttribute("ActionHints",actionHintsToString(d->action_hints));
+        doc->writeAttribute("ActionHints",actionHintsToString(d->action_hints));
+
     if (d->activity_control != NoActivityControlHint)
-        object_node->setAttribute("ActivityControl",activityControlToString(d->activity_control));
+        doc->writeAttribute("ActivityControl",activityControlToString(d->activity_control));
+
     if (d->activity_display != NoActivityDisplayHint)
-        object_node->setAttribute("ActivityDisplay",activityDisplayToString(d->activity_display));
+        doc->writeAttribute("ActivityDisplay",activityDisplayToString(d->activity_display));
+
     if (d->display_flags != NoDisplayFlagsHint)
-        object_node->setAttribute("DisplayFlags",displayFlagsToString(d->display_flags));
+        doc->writeAttribute("DisplayFlags",displayFlagsToString(d->display_flags));
+
     if (d->drag_drop_flags != NoDragDrop)
-        object_node->setAttribute("DragDropFlags",dragDropFlagsToString(d->drag_drop_flags));
+        doc->writeAttribute("DragDropFlags",dragDropFlagsToString(d->drag_drop_flags));
+
     if (d->hierarhical_display != NoHierarchicalDisplayHint)
-        object_node->setAttribute("HierarchicalDisplay",hierarchicalDisplayToString(d->hierarhical_display));
+        doc->writeAttribute("HierarchicalDisplay",hierarchicalDisplayToString(d->hierarhical_display));
+
     if (d->item_view_column_hint != SelectableItems)
-        object_node->setAttribute("ItemSelectionControl",itemSelectionControlToString(d->item_selection_control));
+        doc->writeAttribute("ItemSelectionControl",itemSelectionControlToString(d->item_selection_control));
+
     if (d->item_view_column_hint != ColumnNoHints)
-        object_node->setAttribute("ItemViewColumnFlags",itemViewColumnFlagsToString(d->item_view_column_hint));
+        doc->writeAttribute("ItemViewColumnFlags",itemViewColumnFlagsToString(d->item_view_column_hint));
+
     if (d->naming_control != NoNamingControlHint)
-        object_node->setAttribute("NamingControl",namingControlToString(d->naming_control));
+        doc->writeAttribute("NamingControl",namingControlToString(d->naming_control));
+
     if (d->observer_selection_context != SelectionUseParentContext)
-        object_node->setAttribute("ObserverSelectionContext",observerSelectionContextToString(d->observer_selection_context));
+        doc->writeAttribute("ObserverSelectionContext",observerSelectionContextToString(d->observer_selection_context));
+
     if (d->modification_state_display != NoModificationStateDisplayHint)
-        object_node->setAttribute("ModificationStateDisplay",modificationStateDisplayToString(d->modification_state_display));
+        doc->writeAttribute("ModificationStateDisplay",modificationStateDisplayToString(d->modification_state_display));
 
     // -----------------------------------
     // Start of specific to Qtilities::Qtilities_1_1:
     // -----------------------------------
     if (exportVersion() == Qtilities::Qtilities_1_1) {
         if (d->category_editing_flags != CategoriesReadOnly)
-            object_node->setAttribute("CategoryEditingFlags",categoryEditingFlagsToString(d->category_editing_flags));
+            doc->writeAttribute("CategoryEditingFlags",categoryEditingFlagsToString(d->category_editing_flags));
     }
     // -----------------------------------
     // End of specific to Qtilities::Qtilities_1_1:
@@ -805,7 +813,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
     // -----------------------------------
     if (exportVersion() == Qtilities::Qtilities_1_2) {
         if (d->root_index_display_hint != RootIndexHide)
-            object_node->setAttribute("RootIndexDisplayHint",rootIndexDisplayHintToString(d->root_index_display_hint));
+            doc->writeAttribute("RootIndexDisplayHint",rootIndexDisplayHintToString(d->root_index_display_hint));
     }
     // -----------------------------------
     // End of specific to Qtilities::Qtilities_1_2:
@@ -813,112 +821,107 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Obs
 
     // Export category related stuff only if it is neccesarry:
     if (d->displayed_categories.count() > 0) {
-        QDomElement category_data = doc->createElement("CategoryFilter");
-        object_node->appendChild(category_data);
+        doc->writeStartElement("CategoryFilter");
 
         if (d->category_filter_enabled)
-            category_data.setAttribute("FilterEnabled","True");
+            doc->writeAttribute("FilterEnabled","True");
         else
-            category_data.setAttribute("FilterEnabled","False");
+            doc->writeAttribute("FilterEnabled","False");
+
         if (d->has_inversed_category_display)
-            category_data.setAttribute("FilterInversed","True");
+            doc->writeAttribute("FilterInversed","True");
         else
-            category_data.setAttribute("FilterInversed","False");
-        category_data.setAttribute("CategoryCount",d->displayed_categories.count());
+            doc->writeAttribute("FilterInversed","False");
+
+        doc->writeAttribute("CategoryCount",QString::number(d->displayed_categories.count()));
 
         for (int i = 0; i < d->displayed_categories.count(); ++i) {
-            QDomElement category_item = doc->createElement("Category_" + QString::number(i));
-            d->displayed_categories.at(i).exportXml(doc,&category_item);
-            category_data.appendChild(category_item);
+            doc->writeStartElement("Category_" + QString::number(i));
+            d->displayed_categories.at(i).exportXml(doc);
+            doc->writeEndElement();
         }
+        doc->writeEndElement();
     }
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverHints::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::ObserverHints::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
-     
+
+    QXmlStreamAttributes attributes = doc->attributes();
+
     // Hints:
-    if (object_node->hasAttribute("ActionHints"))
-        d->action_hints = stringToActionHints(object_node->attribute("ActionHints"));
-    if (object_node->hasAttribute("ActivityControl"))
-        d->activity_control = stringToActivityControl(object_node->attribute("ActivityControl"));
-    if (object_node->hasAttribute("ActivityDisplay"))
-        d->activity_display = stringToActivityDisplay(object_node->attribute("ActivityDisplay"));
-    if (object_node->hasAttribute("DisplayFlags"))
-        d->display_flags = stringToDisplayFlags(object_node->attribute("DisplayFlags"));
-    if (object_node->hasAttribute("DragDropFlags"))
-        d->drag_drop_flags = stringToDragDropFlags(object_node->attribute("DragDropFlags"));
-    if (object_node->hasAttribute("HierarchicalDisplay"))
-        d->hierarhical_display = stringToHierarchicalDisplay(object_node->attribute("HierarchicalDisplay"));
-    if (object_node->hasAttribute("ItemSelectionControl"))
-        d->item_selection_control = stringToItemSelectionControl(object_node->attribute("ItemSelectionControl"));
-    if (object_node->hasAttribute("ItemViewColumnFlags"))
-        d->item_view_column_hint = stringToItemViewColumnFlags(object_node->attribute("ItemViewColumnFlags"));
-    if (object_node->hasAttribute("NamingControl"))
-        d->naming_control = stringToNamingControl(object_node->attribute("NamingControl"));
-    if (object_node->hasAttribute("ObserverSelectionContext"))
-        d->observer_selection_context = stringToObserverSelectionContext(object_node->attribute("ObserverSelectionContext"));
-    if (object_node->hasAttribute("ModificationStateDisplay"))
-        d->modification_state_display = stringToModificationStateDisplay(object_node->attribute("ModificationStateDisplay"));
+    if (attributes.hasAttribute("ActionHints"))
+        d->action_hints = stringToActionHints(attributes.value("ActionHints").toString());
+
+    if (attributes.hasAttribute("ActivityControl"))
+        d->activity_control = stringToActivityControl(attributes.value("ActivityControl").toString());
+
+    if (attributes.hasAttribute("ActivityDisplay"))
+        d->activity_display = stringToActivityDisplay(attributes.value("ActivityDisplay").toString());
+
+    if (attributes.hasAttribute("DisplayFlags"))
+        d->display_flags = stringToDisplayFlags(attributes.value("DisplayFlags").toString());
+
+    if (attributes.hasAttribute("DragDropFlags"))
+        d->drag_drop_flags = stringToDragDropFlags(attributes.value("DragDropFlags").toString());
+
+    if (attributes.hasAttribute("HierarchicalDisplay"))
+        d->hierarhical_display = stringToHierarchicalDisplay(attributes.value("HierarchicalDisplay").toString());
+
+    if (attributes.hasAttribute("ItemSelectionControl"))
+        d->item_selection_control = stringToItemSelectionControl(attributes.value("ItemSelectionControl").toString());
+
+    if (attributes.hasAttribute("ItemViewColumnFlags"))
+        d->item_view_column_hint = stringToItemViewColumnFlags(attributes.value("ItemViewColumnFlags").toString());
+
+    if (attributes.hasAttribute("NamingControl"))
+        d->naming_control = stringToNamingControl(attributes.value("NamingControl").toString());
+
+    if (attributes.hasAttribute("ObserverSelectionContext"))
+        d->observer_selection_context = stringToObserverSelectionContext(attributes.value("ObserverSelectionContext").toString());
+
+    if (attributes.hasAttribute("ModificationStateDisplay"))
+        d->modification_state_display = stringToModificationStateDisplay(attributes.value("ModificationStateDisplay").toString());
 
     // -----------------------------------
     // Start of specific to Qtilities v1.1:
     // -----------------------------------
-    if (object_node->hasAttribute("CategoryEditingFlags"))
-        d->category_editing_flags = stringToCategoryEditingFlags(object_node->attribute("CategoryEditingFlags"));
+    if (attributes.hasAttribute("CategoryEditingFlags"))
+        d->category_editing_flags = stringToCategoryEditingFlags(attributes.value("CategoryEditingFlags").toString());
     // -----------------------------------
     // End of specific to Qtilities v1.1:
     // -----------------------------------
     // Start of specific to Qtilities v1.2:
     // -----------------------------------
-    if (object_node->hasAttribute("RootIndexDisplayHint"))
-        d->root_index_display_hint = stringToRootIndexDisplayHint(object_node->attribute("RootIndexDisplayHint"));
+    if (attributes.hasAttribute("RootIndexDisplayHint"))
+        d->root_index_display_hint = stringToRootIndexDisplayHint(attributes.value("RootIndexDisplayHint").toString());
     // -----------------------------------
     // End of specific to Qtilities v1.2:
     // -----------------------------------
 
     // Category stuff:
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc->readNextStartElement()) {
+        QStringRef name = doc->name();
+        QXmlStreamAttributes attr = doc->attributes();
 
-        if (child.isNull())
-            continue;
+        if (name == "CategoryFilter") {
+            d->category_filter_enabled = (attr.value("FilterEnabled") == "True");
+            d->has_inversed_category_display = (attr.value("FilterInversed") == "True");
 
-        if (child.tagName() == QLatin1String("CategoryFilter")) {
-            if (child.attribute("FilterEnabled") == QLatin1String("True"))
-                d->category_filter_enabled = true;
-            else
-                d->category_filter_enabled = false;
-            if (child.attribute("FilterInversed") == QLatin1String("True"))
-                d->has_inversed_category_display = true;
-            else
-                d->has_inversed_category_display = false;
-            QDomNodeList categoryNodes = child.childNodes();
-            for(int i = 0; i < categoryNodes.count(); ++i)
-            {
-                QDomNode categoryNode = categoryNodes.item(i);
-                QDomElement category = categoryNode.toElement();
+            while (doc->readNextStartElement()) {
+                QStringRef name2 = doc->name();
 
-                if (category.isNull())
-                    continue;
-
-                if (category.tagName().startsWith("Category_")) {
+                if (name2.startsWith("Category_")) {
                     QtilitiesCategory new_category;
-                    new_category.importXml(doc,&category,import_list);
+                    new_category.importXml(doc,import_list);
                     if (new_category.isValid())
                         d->displayed_categories << new_category;
-                    continue;
                 }
             }
-            continue;
         }
     }
 

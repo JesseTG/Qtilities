@@ -29,7 +29,6 @@
 #include <QVariant>
 #include <QRegExpValidator>
 #include <QCoreApplication>
-#include <QDomDocument>
 
 using namespace Qtilities::CoreGui::Constants;
 using namespace Qtilities::Core::Properties;
@@ -689,39 +688,42 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::NamingPolicyFilter::exportXml(QDomDocument* doc, QDomElement* object_node) const {
-    Q_UNUSED(doc)
-
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::NamingPolicyFilter::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    object_node->setAttribute("UniquenessPolicy",uniquenessPolicyToString(d->uniqueness_policy));
-    object_node->setAttribute("ValidityResolutionPolicy",resolutionPolicyToString(d->validity_resolution_policy));
-    object_node->setAttribute("UniquenessResolutionPolicy",resolutionPolicyToString(d->uniqueness_resolution_policy));
-    object_node->setAttribute("ProcessingCycleValidationCheckFlags",validationCheckFlagsToString(d->processing_cycle_validation_check_flags));
-    object_node->setAttribute("ValidationCheckFlags",validationCheckFlagsToString(d->validation_check_flags));
+    doc->writeAttribute("UniquenessPolicy",uniquenessPolicyToString(d->uniqueness_policy));
+    doc->writeAttribute("ValidityResolutionPolicy",resolutionPolicyToString(d->validity_resolution_policy));
+    doc->writeAttribute("UniquenessResolutionPolicy",resolutionPolicyToString(d->uniqueness_resolution_policy));
+    doc->writeAttribute("ProcessingCycleValidationCheckFlags",validationCheckFlagsToString(d->processing_cycle_validation_check_flags));
+    doc->writeAttribute("ValidationCheckFlags",validationCheckFlagsToString(d->validation_check_flags));
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::NamingPolicyFilter::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {    
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::NamingPolicyFilter::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (object_node->hasAttribute("NewSubjectActivityPolicy"))
-        d->uniqueness_policy = stringToUniquenessPolicy(object_node->attribute("UniquenessPolicy"));
-    if (object_node->hasAttribute("ValidityResolutionPolicy"))
-        d->validity_resolution_policy = stringToResolutionPolicy(object_node->attribute("ValidityResolutionPolicy"));
-    if (object_node->hasAttribute("UniquenessResolutionPolicy"))
-        d->uniqueness_resolution_policy = stringToResolutionPolicy(object_node->attribute("UniquenessResolutionPolicy"));
-    if (object_node->hasAttribute("ProcessingCycleValidationCheckFlags"))
-        d->processing_cycle_validation_check_flags = stringToValidationCheckFlags(object_node->attribute("ProcessingCycleValidationCheckFlags"));
-    if (object_node->hasAttribute("ValidationCheckFlags"))
-        d->validation_check_flags = stringToValidationCheckFlags(object_node->attribute("ValidationCheckFlags"));
+    QXmlStreamAttributes attributes = doc->attributes();
+
+    if (attributes.hasAttribute("NewSubjectActivityPolicy"))
+        d->uniqueness_policy = stringToUniquenessPolicy(attributes.value("UniquenessPolicy").toString());
+
+    if (attributes.hasAttribute("ValidityResolutionPolicy"))
+        d->validity_resolution_policy = stringToResolutionPolicy(attributes.value("ValidityResolutionPolicy").toString());
+
+    if (attributes.hasAttribute("UniquenessResolutionPolicy"))
+        d->uniqueness_resolution_policy = stringToResolutionPolicy(attributes.value("UniquenessResolutionPolicy").toString());
+
+    if (attributes.hasAttribute("ProcessingCycleValidationCheckFlags"))
+        d->processing_cycle_validation_check_flags = stringToValidationCheckFlags(attributes.value("ProcessingCycleValidationCheckFlags").toString());
+
+    if (attributes.hasAttribute("ValidationCheckFlags"))
+        d->validation_check_flags = stringToValidationCheckFlags(attributes.value("ValidationCheckFlags").toString());
 
 
     return IExportable::Complete;

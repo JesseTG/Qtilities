@@ -17,8 +17,6 @@
 
 #include <QMutex>
 #include <QVariant>
-#include <QDomElement>
-#include <QDomDocument>
 
 using namespace Qtilities::Core::Constants;
 
@@ -266,89 +264,78 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::Sub
         return IExportable::Failed;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::SubjectTypeFilter::exportXml(QDomDocument* doc, QDomElement* object_node) const {
-    Q_UNUSED(doc)
-    Q_UNUSED(object_node)
-
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::SubjectTypeFilter::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
      
     if (d->inversed_filtering)
-        object_node->setAttribute("InversedFiltering","True");
+        doc->writeAttribute("InversedFiltering","True");
+
     if (!d->known_objects_group_name.isEmpty())
-        object_node->setAttribute("GroupName",d->known_objects_group_name);
-    object_node->setAttribute("TypeCount",d->known_subject_types.count());
+        doc->writeAttribute("GroupName",d->known_objects_group_name);
+
+    doc->writeAttribute("TypeCount",QString::number(d->known_subject_types.count()));
 
     // Categories:
     if (d->known_subject_types.count() > 0) {
-        QDomElement known_type_node = doc->createElement("KnownTypes");
-        object_node->appendChild(known_type_node);
+        doc->writeStartElement("KnownTypes");
         for (int i = 0; i < d->known_subject_types.count(); ++i) {
-            QDomElement known_type = doc->createElement("Type_" + QString::number(i));
-            known_type_node.appendChild(known_type);
-            known_type.setAttribute("MetaType",d->known_subject_types.at(i).d_meta_type);
-            known_type.setAttribute("Name",d->known_subject_types.at(i).d_name);
+            doc->writeEmptyElement("Type_" + QString::number(i));
+            doc->writeAttribute("MetaType",d->known_subject_types.at(i).d_meta_type);
+            doc->writeAttribute("Name",d->known_subject_types.at(i).d_name);
         }
+        doc->writeEndElement();
     }
 
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::SubjectTypeFilter::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
-    Q_UNUSED(import_list)
-
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::Core::SubjectTypeFilter::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
-    if (object_node->hasAttribute("InversedFiltering")) {
-        if (object_node->attribute("InversedFiltering") == QString("True"))
-            d->inversed_filtering = true;
-        else
-            d->inversed_filtering = false;
+    QXmlStreamAttributes attributes = doc->attributes();
+
+    if (attributes.hasAttribute("InversedFiltering")) {
+        d->inversed_filtering = (attributes.value("InversedFiltering") == "True");
     }
-    if (object_node->hasAttribute("GroupName"))
-        d->known_objects_group_name = object_node->attribute("GroupName");
+
+    if (attributes.hasAttribute("GroupName"))
+        d->known_objects_group_name = attributes.value("GroupName").toString();
 
     int count_readback = 0;
-    if (object_node->hasAttribute("TypeCount"))
-        count_readback = object_node->attribute("TypeCount").toInt();
+    if (attributes.hasAttribute("TypeCount"))
+        count_readback = attributes.value("TypeCount").toInt();
 
     // Known types stuff:
-    QDomNodeList childNodes = object_node->childNodes();
-    for(int i = 0; i < childNodes.count(); ++i)
-    {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc->readNext() != QXmlStreamReader::EndElement) {
+        QString childName = doc->name().toString();
 
-        if (child.isNull())
-            continue;
+        if (childName == "KnownTypes") {
+            while (doc->readNext() != QXmlStreamReader::EndElement) {
+                QString name2 = doc->name().toString();
 
-        if (child.tagName() == QLatin1String("KnownTypes")) {
-            QDomNodeList knownTypesNodes = child.childNodes();
-            for(int i = 0; i < knownTypesNodes.count(); ++i)
-            {
-                QDomNode knownTypesNode = knownTypesNodes.item(i);
-                QDomElement knownType = knownTypesNode.toElement();
+                if (name2.startsWith("Type")) {
+                    QXmlStreamAttributes attr2 = doc->attributes();
 
-                if (knownType.isNull())
-                    continue;
+                    QString metaType = attr2.value("MetaType").toString();
+                    QString name = attr2.value("Name").toString();
 
-                if (knownType.tagName().startsWith("Type")) {
-                    QString meta_type = knownType.attribute("MetaType");
-                    QString name = knownType.attribute("Name");
-                    if (meta_type.isEmpty() || name.isEmpty()) {
+                    if (metaType.isEmpty() || name.isEmpty()) {
                         LOG_ERROR(tr("Invalid subject type filter parameters detected. This filter will not be included in the parsed tree."));
-                        return IExportable::Failed;
+                            return IExportable::Failed;
                     }
-                    SubjectTypeInfo new_type(meta_type, name);
+
+                    SubjectTypeInfo new_type(metaType, name);
                     d->known_subject_types << new_type;
-                    continue;
+
+                    doc->skipCurrentElement();
                 }
             }
-            continue;
+
+            doc->skipCurrentElement();
         }
     }
 

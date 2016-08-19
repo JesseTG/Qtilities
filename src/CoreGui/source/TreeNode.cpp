@@ -14,7 +14,8 @@
 #include "QtilitiesApplication.h"
 
 #include <QApplication>
-#include <QtXml>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
 using namespace Qtilities::CoreGui::Constants;
 
@@ -48,12 +49,12 @@ Qtilities::CoreGui::TreeNode::~TreeNode() {
     delete nodeData;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeNode::exportFormattingXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) const {
-    return saveFormattingToXML(doc,object_node,version);
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeNode::exportFormattingXML(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const {
+    return saveFormattingToXML(doc,version);
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeNode::importFormattingXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) {
-    return loadFormattingFromXML(doc,object_node,version);
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeNode::importFormattingXML(QXmlStreamReader* doc, Qtilities::ExportVersion version) {
+    return loadFormattingFromXML(doc,version);
 }
 
 bool Qtilities::CoreGui::TreeNode::setCategory(const QtilitiesCategory& category, TreeNode* tree_node) {
@@ -339,35 +340,34 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
 
     //QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-    // Create the QDomDocument:
-    QDomDocument doc("QtilitiesTreeExport");
-    QDomElement root = doc.createElement("QtilitiesTree");
-    doc.appendChild(root);
+    QXmlStreamWriter doc(&file);
+    doc.setAutoFormatting(true);
+    doc.setAutoFormattingIndent(2);
+    doc.writeComment("Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString());
+    doc.writeStartDocument("1.0");
+    doc.writeAttribute("encoding","UTF-8");
+    doc.writeStartElement("QtilitiesTree");
 
     // ---------------------------------------------------
     // Save file format information:
     // ---------------------------------------------------
-    root.setAttribute("ExportVersion",QString::number(exportVersion()));
-    root.setAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
-    root.setAttribute("ApplicationExportVersion",QString::number(applicationExportVersion()));
-    root.setAttribute("ApplicationVersion",QApplication::applicationVersion());
-    root.setAttribute("ApplicationName",QApplication::applicationName());
+    doc.writeAttribute("ExportVersion",QString::number(exportVersion()));
+    doc.writeAttribute("QtilitiesVersion",CoreGui::QtilitiesApplication::qtilitiesVersionString());
+    doc.writeAttribute("ApplicationExportVersion",QString::number(applicationExportVersion()));
+    doc.writeAttribute("ApplicationVersion",QApplication::applicationVersion());
+    doc.writeAttribute("ApplicationName",QApplication::applicationName());
 
     // ---------------------------------------------------
     // Do the actual export:
     // ---------------------------------------------------
-    QDomElement rootItem = doc.createElement("Root");
-    root.appendChild(rootItem);
-    IExportable::ExportResultFlags result = exportXmlExt(&doc,&rootItem,export_flags);
+    doc.writeStartElement("Root");
+    IExportable::ExportResultFlags result = exportXmlExt(&doc,export_flags);
     if (result == IExportable::Failed && errorMsg)
         *errorMsg = QString(tr("XML exporting on the observer base class failed. Please see the log for details."));
 
     // Put the complete doc in a string and save it to the file:
     // Still write it even if it fails so that we can check the output file for debugging purposes.
-    QString docStr = doc.toString(2);
-    docStr.prepend("<!--Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString() + "-->\n");
-    docStr.prepend("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    if (file.write(docStr.toUtf8()) == -1) {
+    if (file.error() != QFileDevice::NoError) {
         file.close();
         if (errorMsg)
             *errorMsg = QString(tr("Failed to write to output file during tree node export:")).arg(file_name);
@@ -375,9 +375,12 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
         return IExportable::Failed;
     }
 
+    doc.writeEndElement();
+    doc.writeEndElement();
+    doc.writeEndDocument();
+
     file.close();
 
-    //QApplication::restoreOverrideCursor();
     return result;
 }
 
@@ -386,7 +389,6 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
         deleteAll();
 
     // Load the file into doc:
-    QDomDocument doc("QtilitiesTreeExport");
     QFile file(file_name);
     if (!file.open(QIODevice::ReadOnly)) {
         if (errorMsg)
@@ -394,16 +396,20 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
         LOG_ERROR(QString(tr("TreeNode could not be loaded from file. File \"%1\" could not be opened in ReadOnly mode.")).arg(file_name));
         return IExportable::Failed;
     }
-    
+
+
     //QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
     QString docStr = file.readAll();
-    QString error_string;
-    int error_line;
-    int error_column;
-    if (!doc.setContent(docStr,&error_string,&error_line,&error_column)) {
+    QXmlStreamReader doc(docStr);
+
+    if (doc.error() != QXmlStreamReader::NoError) {
+        int error_line = doc.lineNumber();
+        int error_column = doc.columnNumber();
+        QString error_string = doc.errorString();
+
         if (errorMsg)
-            *errorMsg = QString(tr("The tree input file could not be parsed by QDomDocument. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string);
-        LOG_ERROR(QString(tr("The tree input file could not be parsed by QDomDocument. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string));
+            *errorMsg = QString(tr("The tree input file could not be parsed by QXmlStreamReader. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string);
+        LOG_ERROR(QString(tr("The tree input file could not be parsed by QXmlStreamReader. Error on line %1 column %2: %3")).arg(error_line).arg(error_column).arg(error_string));
         file.close();
         //QApplication::restoreOverrideCursor();
         return IExportable::Failed;
@@ -413,14 +419,14 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
     startProcessingCycle();
 
     // Interpret the loaded doc:
-    QDomElement root = doc.documentElement();
+    QXmlStreamAttributes attributes = doc.attributes();
 
     // ---------------------------------------------------
     // Inspect file format:
     // ---------------------------------------------------
     Qtilities::ExportVersion read_version;
-    if (root.hasAttribute("ExportVersion")) {
-        read_version = (Qtilities::ExportVersion) root.attribute("ExportVersion").toInt();
+    if (attributes.hasAttribute("ExportVersion")) {
+        read_version = (Qtilities::ExportVersion) attributes.value("ExportVersion").toInt();
         LOG_INFO(QString(tr("Inspecting tree node file format: Qtilities export format version: %1")).arg(read_version));
     } else {
         if (errorMsg)
@@ -429,11 +435,11 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
         //QApplication::restoreOverrideCursor();
         return IExportable::Failed;
     }
-    if (root.hasAttribute("QtilitiesVersion"))
-        LOG_INFO(QString(tr("Inspecting tree node file format: Qtilities version used to save the file: %1")).arg(root.attribute("QtilitiesVersion")));
+    if (attributes.hasAttribute("QtilitiesVersion"))
+        LOG_INFO(QString(tr("Inspecting tree node file format: Qtilities version used to save the file: %1")).arg(attributes.value("QtilitiesVersion").toString()));
     quint32 application_read_version = 0;
-    if (root.hasAttribute("ApplicationExportVersion")) {
-        application_read_version = root.attribute("ApplicationExportVersion").toInt();
+    if (attributes.hasAttribute("ApplicationExportVersion")) {
+        application_read_version = attributes.value("ApplicationExportVersion").toInt();
         LOG_INFO(QString(tr("Inspecting tree node file format: Application export format version: %1")).arg(application_read_version));
     } else {
         if (errorMsg)
@@ -442,8 +448,8 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
         //QApplication::restoreOverrideCursor();
         return IExportable::Failed;
     }
-    if (root.hasAttribute("ApplicationVersion"))
-        LOG_INFO(QString(tr("Inspecting tree node file format: Application version used to save the file: %1")).arg(root.attribute("ApplicationVersion")));
+    if (attributes.hasAttribute("ApplicationVersion"))
+        LOG_INFO(QString(tr("Inspecting tree node file format: Application version used to save the file: %1")).arg(attributes.value("ApplicationVersion").toString()));
 
     // ---------------------------------------------------
     // Check if input format is supported:
@@ -465,21 +471,18 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
     // ---------------------------------------------------
     IExportable::ExportResultFlags result = IExportable::Complete;
     QList<QPointer<QObject> > internal_import_list;
-    QDomNodeList childNodes = root.childNodes();
-    for(int i = 0; i < childNodes.count(); ++i) {
-        QDomNode childNode = childNodes.item(i);
-        QDomElement child = childNode.toElement();
+    while (doc.readNextStartElement()) {
+        QStringRef tag = doc.name();
 
-        if (child.isNull())
-            continue;
+        if (tag == "Root") {
+            QXmlStreamAttributes attr = doc.attributes();
 
-        if (child.tagName() == QLatin1String("Root")) {
             // Restore the instance name:
-            if (child.hasAttribute("Name"))
-                setObjectName(child.attribute("Name"));
+            if (attr.hasAttribute("Name"))
+                setObjectName(attr.value("Name").toString());
 
             // Do import on observer base class:
-            IExportable::ExportResultFlags intermediate_result = importXml(&doc,&child,internal_import_list);
+            IExportable::ExportResultFlags intermediate_result = importXml(&doc,internal_import_list);
             if (intermediate_result == IExportable::Failed) {
                 if (errorMsg)
                     *errorMsg = QString(tr("XML importing on the observer base class failed. Please see the log for details."));
@@ -496,8 +499,9 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
                     }
                 }
                 break;
-            } else if (intermediate_result == IExportable::Incomplete)
-                result = intermediate_result;
+            } else if (intermediate_result == IExportable::Incomplete) {
+              result = intermediate_result;
+            }
         }
     }
 

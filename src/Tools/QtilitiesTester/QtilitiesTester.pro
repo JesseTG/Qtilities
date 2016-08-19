@@ -8,7 +8,6 @@ QTILITIES += testing
 include(../../Qtilities.pri)
 
 QT += core \
-      xml \
       gui
 
 greaterThan(QT_MAJOR_VERSION, 4) {

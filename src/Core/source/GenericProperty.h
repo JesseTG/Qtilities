@@ -21,6 +21,9 @@
 #include <QtilitiesCategory>
 #include <Factory>
 
+class QXmlStreamWriter;
+class QXmlStreamReader;
+
 namespace Qtilities {
     namespace Core {
 
@@ -584,8 +587,8 @@ namespace Qtilities {
             static InstanceFactoryInfo staticInstanceFactoryInfo();
             virtual IExportable::ExportModeFlags supportedFormats() const;
             virtual InstanceFactoryInfo instanceFactoryInfo() const;
-            virtual IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            virtual IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            virtual IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            virtual IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             // --------------------------------
             // IModificationNotifier Implementation

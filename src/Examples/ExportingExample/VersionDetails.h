@@ -38,6 +38,9 @@
 #include <IExportable>
 #include <Factory>
 
+class QXmlStreamWriter;
+class QXmlStreamReader;
+
 namespace Qtilities {
     namespace Examples {
         //! Namespace containing all the classes which forms part of the Exporting Example.
@@ -77,8 +80,8 @@ namespace Qtilities {
                 // --------------------------------
                 ExportModeFlags supportedFormats() const;
                 InstanceFactoryInfo instanceFactoryInfo() const;
-                IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-                IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+                IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+                IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
                 // --------------------------------
                 // Factory Interface Implemenation

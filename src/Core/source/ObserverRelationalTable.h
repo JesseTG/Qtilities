@@ -19,6 +19,9 @@
 
 #include <QObject>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 using namespace Qtilities::Core::Properties;
 
 namespace Qtilities {
@@ -105,8 +108,8 @@ namespace Qtilities {
             IExportable::ExportModeFlags supportedFormats() const;
             IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
             IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         private:
             QString intListToString(QList<int> list) const;
@@ -211,7 +214,7 @@ for (int i = 0; i < table.count(); i++) {
           */
 
         class QTILIITES_CORE_SHARED_EXPORT ObserverRelationalTable : public IExportable
-        {            
+        {
             friend class Qtilities::Core::ObserverData;
 
         public:
@@ -266,7 +269,7 @@ for (int i = 0; i < table.count(); i++) {
             RelationalTableEntry* entryAt(int index);
             //! Returns the entry at position index.
             RelationalTableEntry* entryAt(int index) const;
-            
+
             //! Prints the table information to the debug output.
             void dumpTableInfo() const;
             //! Gets the visitor ID of an object. Returns -1 if no visitor ID exists.
@@ -299,8 +302,8 @@ for (int i = 0; i < table.count(); i++) {
             IExportable::ExportModeFlags supportedFormats() const;
             IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
             IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         private:
             //! Returns true if all the objects in the pointer list matches the objects in the table using the visitor ID property on each object. This comparison does not take any relational data into account.

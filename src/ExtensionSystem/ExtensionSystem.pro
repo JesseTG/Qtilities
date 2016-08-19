@@ -11,8 +11,7 @@ include(../Qtilities.pri)
 INCLUDEPATH += $$QTILITIES_INCLUDE/QtilitiesExtensionSystem
 
 CONFIG += qt dll
-QT += xml gui
-# Note: xml module is deprecated
+QT += gui
 
 greaterThan(QT_MAJOR_VERSION, 4) { QT += widgets printsupport }
 

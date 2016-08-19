@@ -19,6 +19,9 @@
 #include "QtilitiesCore_global.h"
 #include "IExportable.h"
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 namespace Qtilities {
     namespace Core {
         using namespace Qtilities::Core::Interfaces;
@@ -76,8 +79,8 @@ namespace Qtilities {
             /*!
               This function adds a category level node under \p object_node with all the information about this category level.
               */
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
             //! The name of the category level.
             QString                 d_name;
@@ -116,7 +119,7 @@ toString() or to a string list using toStringList().
 
 It is possible to set the access mode of a category using setAccessMode() and the access mode can be accessed
 using accessMode(). A QtilitiesCategory object supports streaming to a QDataStream or saving its data
-to a XML QDomElement node. This is made possible by the implementation of Qtilities::Core::Interfaces::IExportable.
+to a QXmlStreamWriter. This is made possible by the implementation of Qtilities::Core::Interfaces::IExportable.
 
 \section qtilities_category_usage_scenario Usage Scenario
 
@@ -297,8 +300,8 @@ sure that categories are handled the same way everywhere. Some usages in %Qtilit
 
               \note The category icon is not exported along with your category.
               */
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         protected:
             QList<CategoryLevel>    d_category_levels;

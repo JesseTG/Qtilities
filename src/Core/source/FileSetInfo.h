@@ -22,6 +22,9 @@
 #include <QObject>
 #include <QStringList>
 
+class QXmlStreamReader;
+class QXmlStreamWriter;
+
 using namespace Qtilities::Core::Interfaces;
 
 namespace Qtilities {
@@ -208,8 +211,8 @@ namespace Qtilities {
             InstanceFactoryInfo instanceFactoryInfo() const;
             IExportable::ExportResultFlags exportBinary(QDataStream& stream ) const;
             IExportable::ExportResultFlags importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list);
-            IExportable::ExportResultFlags exportXml(QDomDocument* doc, QDomElement* object_node) const;
-            IExportable::ExportResultFlags importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list);
+            IExportable::ExportResultFlags exportXml(QXmlStreamWriter* doc) const;
+            IExportable::ExportResultFlags importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list);
 
         signals:
             //! Emitted when the contents of a file changed.

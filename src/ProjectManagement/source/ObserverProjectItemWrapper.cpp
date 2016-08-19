@@ -18,7 +18,6 @@
 #include <IFactoryProvider>
 
 #include <QApplication>
-#include <QDomNodeList>
 
 using namespace Qtilities::Core::Interfaces;
 using namespace Qtilities::Core;
@@ -121,7 +120,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     return d->observer->exportBinaryExt(stream,d->export_flags);
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::ObserverProjectItemWrapper::importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list) {    
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::ObserverProjectItemWrapper::importBinary(QDataStream& stream, QList<QPointer<QObject> >& import_list) {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
@@ -133,7 +132,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     return d->observer->importBinary(stream,import_list);
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::ObserverProjectItemWrapper::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::ObserverProjectItemWrapper::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
@@ -141,15 +140,17 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     if (d->observer) {
         // Add a new node for this observer. We don't want it to add its factory data
         // to the ProjectItem node.
-        QDomElement wrapper_data = doc->createElement("ObserverProjectItemWrapper");
-        object_node->appendChild(wrapper_data);
-        return d->observer->exportXmlExt(doc,&wrapper_data,d->export_flags);
+
+        doc->writeStartElement("ObserverProjectItemWrapper");
+        ExportResultFlags result = d->observer->exportXmlExt(doc,d->export_flags);
+        doc->writeEndElement();
+
+        return result;
     } else
         return IExportable::Incomplete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::ObserverProjectItemWrapper::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::ObserverProjectItemWrapper::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
@@ -157,20 +158,14 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
         return version_check_result;
 
     if (d->observer) {
-        QDomNodeList childNodes = object_node->childNodes();
-        for(int i = 0; i < childNodes.count(); ++i)
-        {
-            QDomNode childNode = childNodes.item(i);
-            QDomElement child = childNode.toElement();
+        while (doc->readNextStartElement()) {
+          QStringRef name = doc->name();
 
-            if (child.isNull())
-                continue;
-
-            if (child.tagName() == QLatin1String("ObserverProjectItemWrapper")) {
-                d->observer->setExportVersion(exportVersion());
-                doc->clear();
-                return d->observer->importXml(doc,&child,import_list);
-            }
+          if (name == "ObserverProjectItemWrapper") {
+            d->observer->setExportVersion(exportVersion());
+            doc->clear(); // what does this do exactly??
+            return d->observer->importXml(doc,import_list);
+          }
         }
     }
 

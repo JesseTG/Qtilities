@@ -11,14 +11,13 @@
 
 #include "TestExporting.h"
 
+#include <QString>
+
 #include <QtilitiesProjectManagement>
 using namespace QtilitiesProjectManagement;
 
 #include <QtilitiesExtensionSystem>
 using namespace QtilitiesExtensionSystem;
-
-#include <QDomDocument>
-#include <QDomElement>
 
 int Qtilities::Testing::TestExporting::execTest(int argc, char ** argv) {
     return QTest::qExec(this,argc,argv);
@@ -46,60 +45,78 @@ void Qtilities::Testing::TestExporting::genericTest(IExportable* obj_source, IEx
     // Binary Exporting & Importing
     // -------------------------------------------------
     if (obj_source->supportedFormats() & IExportable::Binary && obj_import_binary) {
-        QFile file(QtilitiesApplication::applicationSessionPath() + "/" + file_name + ".binary");
-        file.open(QIODevice::WriteOnly);
-        QDataStream stream_out(&file);
+        QFile bin(QtilitiesApplication::applicationSessionPath() + "/" + file_name + ".binary");
+        bin.open(QIODevice::WriteOnly);
+        QDataStream stream_out(&bin);
         stream_out.setVersion(data_stream_write_version);
         obj_source->setExportVersion(write_version);
         obj_source->exportBinary(stream_out);
-        file.close();
+        bin.close();
 
-        file.open(QIODevice::ReadOnly);
-        QDataStream stream_in(&file);
+        bin.open(QIODevice::ReadOnly);
+        QDataStream stream_in(&bin);
         stream_in.setVersion(data_stream_read_version);
         obj_import_binary->setExportVersion(read_version);
         obj_import_binary->importBinary(stream_in,import_list);
 
-        QFile file1(QtilitiesApplication::applicationSessionPath() + "/" + file_name + "_readback.binary");
-        file1.open(QIODevice::WriteOnly);
-        QDataStream stream_out1(&file1);
+        QFile binReadback(QtilitiesApplication::applicationSessionPath() + "/" + file_name + "_readback.binary");
+        binReadback.open(QIODevice::WriteOnly);
+        QDataStream stream_out1(&binReadback);
         stream_out1.setVersion(data_stream_write_version);
         obj_import_binary->exportBinary(stream_out1);
-        file1.close();
+        binReadback.close();
     }
 
     // -------------------------------------------------
     // XML Exporting & Importing
     // -------------------------------------------------
     if (obj_source->supportedFormats() & IExportable::XML && obj_import_xml) {
-        QFile file(QtilitiesApplication::applicationSessionPath() + "/" + file_name + ".xml");
-        file.open(QIODevice::WriteOnly);
-        QDomDocument doc("QtilitiesTesting");
-        QDomElement root = doc.createElement("QtilitiesTesting");
-        doc.appendChild(root);
-        QDomElement rootItem = doc.createElement("object_node");
-        root.appendChild(rootItem);
+        QFile xml(QtilitiesApplication::applicationSessionPath() + "/" + file_name + ".xml");
+        xml.open(QIODevice::WriteOnly);
+        QXmlStreamWriter write1(&xml);
+        write1.setAutoFormatting(true);
+        write1.setAutoFormattingIndent(2);
 
-        QVERIFY(obj_source->exportXml(&doc,&rootItem) == IExportable::Complete);
-        QString docStr = doc.toString(2);
-        file.write(docStr.toUtf8());
-        file.close();
+        write1.writeStartDocument();
+        write1.writeStartElement("QtilitiesTesting");
+        write1.writeStartElement("object_node");
+
+        QCOMPARE(obj_source->exportXml(&write1), IExportable::Complete);
+
+        write1.writeEndElement();
+        write1.writeEndElement();
+        write1.writeEndDocument();
+
+        xml.close();
+        xml.open(QIODevice::ReadOnly);
+        xml.seek(0);
+
+        QXmlStreamReader read1(&xml);
+        read1.readNextStartElement();
+        read1.readNextStartElement();
 
         obj_import_xml->setExportVersion(read_version);
-        QVERIFY(obj_import_xml->importXml(&doc,&rootItem,import_list) == IExportable::Complete);
+        QCOMPARE(obj_import_xml->importXml(&read1,import_list), IExportable::Complete);
 
-        QFile file2(QtilitiesApplication::applicationSessionPath() + "/" + file_name + "_readback.xml");
-        file2.open(QIODevice::WriteOnly);
-        QDomDocument doc2("QtilitiesTesting");
-        QDomElement root2 = doc2.createElement("QtilitiesTesting");
-        doc2.appendChild(root2);
-        QDomElement rootItem2 = doc2.createElement("object_node");
-        root2.appendChild(rootItem2);
-        QVERIFY(obj_import_xml->exportXml(&doc2,&rootItem2) == IExportable::Complete);
-        QString docStr2 = doc2.toString(2);
-        file2.write(docStr2.toUtf8());
-        file2.close();
-    }  
+        QFile xmlReadback(QtilitiesApplication::applicationSessionPath() + "/" + file_name + "_readback.xml");
+        xmlReadback.open(QIODevice::WriteOnly);
+
+        QXmlStreamWriter write2(&xmlReadback);
+        write2.setAutoFormatting(true);
+        write2.setAutoFormattingIndent(2);
+
+        write2.writeStartDocument();
+        write2.writeStartElement("QtilitiesTesting");
+        write2.writeStartElement("object_node");
+
+        QCOMPARE(obj_import_xml->exportXml(&write2), IExportable::Complete);
+
+        write2.writeEndElement();
+        write2.writeEndElement();
+        write2.writeEndDocument();
+
+        xmlReadback.close();
+    }
 }
 
 // --------------------------------------------------------------------
@@ -149,35 +166,54 @@ void Qtilities::Testing::TestExporting::testExportDynamicProperties_w1_0_r1_0() 
     // -------------------------------------------------
     // XML Exporting & Importing
     // -------------------------------------------------
-    QDomDocument doc("QtilitiesTesting");
-    QDomElement root = doc.createElement("QtilitiesTesting");
-    doc.appendChild(root);
-    QDomElement rootItem = doc.createElement("Root");
-    root.appendChild(rootItem);
     QFile xml_file(QtilitiesApplication::applicationSessionPath() + "/testExportDynamicProperties_w1_0_r1_0.xml");
     xml_file.open(QIODevice::WriteOnly);
 
-    QVERIFY(ObjectManager::exportObjectPropertiesXml(obj_source,&doc,&rootItem) == IExportable::Complete);
-    QString docStr = doc.toString(2);
-    xml_file.write(docStr.toUtf8());
+    QXmlStreamWriter write1(&xml_file);
+    write1.setAutoFormatting(true);
+    write1.setAutoFormattingIndent(2);
+
+    write1.writeStartDocument();
+    write1.writeStartElement("QtilitiesTesting");
+    write1.writeStartElement("Root");
+
+    QCOMPARE(ObjectManager::exportObjectPropertiesXml(obj_source,&write1), IExportable::Complete);
+
+    write1.writeEndElement();
+    write1.writeEndElement();
+    write1.writeEndDocument();
+
     xml_file.close();
+    xml_file.open(QIODevice::ReadOnly);
 
     QVERIFY(!ObjectManager::compareDynamicProperties(obj_source,obj_import_xml));
-    QVERIFY(ObjectManager::importObjectPropertiesXml(obj_import_xml,&doc,&rootItem) == IExportable::Complete);
+
+    QXmlStreamReader read1(&xml_file);
+    read1.readNextStartElement();
+    read1.readNextStartElement();
+
+    QCOMPARE(ObjectManager::importObjectPropertiesXml(obj_import_xml,&read1), IExportable::Complete);
     //QVERIFY(ObjectManager::compareDynamicProperties(obj_source,obj_import_xml));
+    xml_file.close();
 
     // Create a readback file:
-    QDomDocument doc2("QtilitiesTesting");
-    QDomElement root2 = doc2.createElement("QtilitiesTesting");
-    doc2.appendChild(root2);
-    QDomElement rootItem2 = doc2.createElement("Root");
-    root2.appendChild(rootItem2);
     QFile xml_file2(QtilitiesApplication::applicationSessionPath() + "/testExportDynamicProperties_w1_0_r1_0_readback.xml");
     xml_file2.open(QIODevice::WriteOnly);
 
-    QVERIFY(ObjectManager::exportObjectPropertiesXml(obj_import_xml,&doc2,&rootItem2) == IExportable::Complete);
-    QString docStr2 = doc2.toString(2);
-    xml_file2.write(docStr2.toUtf8());
+    QXmlStreamWriter write2(&xml_file2);
+    write2.setAutoFormatting(true);
+    write2.setAutoFormattingIndent(2);
+
+    write2.writeStartDocument();
+    write2.writeStartElement("QtilitiesTesting");
+    write2.writeStartElement("Root");
+
+    QCOMPARE(ObjectManager::exportObjectPropertiesXml(obj_import_xml,&write2), IExportable::Complete);
+
+    write2.writeEndElement();
+    write2.writeEndElement();
+    write2.writeEndDocument();
+
     xml_file2.close();
 
     delete obj_source;
@@ -216,16 +252,25 @@ void Qtilities::Testing::TestExporting::testInstanceFactoryInfo_w1_0_r1_0() {
     // -------------------------------------------------
     // XML Exporting & Importing
     // -------------------------------------------------
-    QDomDocument doc("QtilitiesTesting");
-    QDomElement root = doc.createElement("QtilitiesTesting");
-    doc.appendChild(root);
-    QDomElement rootItem = doc.createElement("Root");
+    QString string;
+    QXmlStreamWriter write1(&string);
+    write1.writeStartDocument();
+    write1.writeStartElement("QtilitiesTesting");
+    write1.writeStartElement("Root");
 
-    QVERIFY(obj_source.exportXml(&doc,&rootItem,write_version));
+    QVERIFY(obj_source.exportXml(&write1,write_version));
+
+    write1.writeEndElement();
+    write1.writeEndElement();
+    write1.writeEndDocument();
+
+    QXmlStreamReader read1(string);
+    read1.readNextStartElement();
+    read1.readNextStartElement();
 
     InstanceFactoryInfo obj_import_xml;
     QVERIFY(obj_source != obj_import_xml);
-    QVERIFY(obj_import_xml.importXml(&doc,&rootItem,read_version) == true);
+    QVERIFY(obj_import_xml.importXml(&read1,read_version));
     QVERIFY(obj_source == obj_import_xml);
 }
 
@@ -958,30 +1003,50 @@ void Qtilities::Testing::TestExporting::testObserver_w1_0_r1_0() {
 
         QFile file("testObserverExtendedAll_w1_0_r1_0.xml");
         file.open(QIODevice::WriteOnly);
-        QDomDocument doc("QtilitiesTesting");
-        QDomElement root = doc.createElement("QtilitiesTesting");
-        doc.appendChild(root);
-        QDomElement rootItem = doc.createElement("object_node");
-        root.appendChild(rootItem);
-        QVERIFY(obj_source->exportXmlExt(&doc,&rootItem,ObserverData::ExportAllItems) == IExportable::Complete);
-        QString docStr = doc.toString(2);
-        file.write(docStr.toUtf8());
+
+        QXmlStreamWriter write1(&file);
+        write1.setAutoFormatting(true);
+        write1.setAutoFormattingIndent(2);
+        write1.writeStartDocument();
+        write1.writeStartElement("QtilitiesTesting");
+        write1.writeStartElement("object_node");
+
+        QCOMPARE(obj_source->exportXmlExt(&write1,ObserverData::ExportAllItems), IExportable::Complete);
+
+        write1.writeEndElement();
+        write1.writeEndElement();
+        write1.writeEndDocument();
+
         file.close();
+        file.open(QIODevice::ReadOnly);
+        file.seek(0);
+
+        QXmlStreamReader read1(&file);
+        read1.readNextStartElement();
+        read1.readNextStartElement();
 
         obj_import_xml->setExportVersion(read_version);
         QList<QPointer<QObject> > import_list;
-        QVERIFY(obj_import_xml->importXml(&doc,&rootItem,import_list) == IExportable::Complete);
+        QCOMPARE(obj_import_xml->importXml(&read1,import_list), IExportable::Complete);
+
+        file.close();
 
         QFile file2("testObserverExtendedAll_w1_0_r1_0_readback.xml");
         file2.open(QIODevice::WriteOnly);
-        QDomDocument doc2("QtilitiesTesting");
-        QDomElement root2 = doc2.createElement("QtilitiesTesting");
-        doc2.appendChild(root2);
-        QDomElement rootItem2 = doc2.createElement("object_node");
-        root2.appendChild(rootItem2);
-        QVERIFY(obj_import_xml->exportXmlExt(&doc2,&rootItem2,ObserverData::ExportAllItems) == IExportable::Complete);
-        QString docStr2 = doc2.toString(2);
-        file2.write(docStr2.toUtf8());
+
+        QXmlStreamWriter write2(&file2);
+        write2.setAutoFormatting(true);
+        write2.setAutoFormattingIndent(2);
+        write2.writeStartDocument();
+        write2.writeStartElement("QtilitiesTesting");
+        write2.writeStartElement("object_node");
+
+        QCOMPARE(obj_import_xml->exportXmlExt(&write2,ObserverData::ExportAllItems), IExportable::Complete);
+
+        write2.writeEndElement();
+        write2.writeEndElement();
+        write2.writeEndDocument();
+
         file2.close();
 
         QString file_original_xml = QString("%1/%2.xml").arg(QtilitiesApplication::applicationSessionPath()).arg("testObserverExtendedAll_w1_0_r1_0");

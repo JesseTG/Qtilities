@@ -19,7 +19,6 @@
 #include <IFactoryProvider>
 
 #include <QApplication>
-#include <QDomNodeList>
 
 using namespace Qtilities::Core::Interfaces;
 using namespace Qtilities::CoreGui;
@@ -118,7 +117,7 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     return IExportable::Complete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::CodeEditorProjectItemWrapper::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::CodeEditorProjectItemWrapper::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
@@ -126,20 +125,19 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
     if (d->code_editor) {
         // Add a new node for this code editor. We don't want it to add its factory data
         // to the ProjectItem node.
-        QDomElement wrapper_data = doc->createElement("CodeEditorProjectItemWrapper");
-        object_node->appendChild(wrapper_data);
+
+        doc->writeStartElement("CodeEditorProjectItemWrapper");
 
         // Add the text to a CDATA section:
-        QDomCDATASection text_node = doc->createCDATASection(d->code_editor->codeEditor()->toPlainText());
-        wrapper_data.appendChild(text_node);
+        doc->writeCDATA(d->code_editor->codeEditor()->toPlainText());
+        doc->writeEndElement();
 
         return IExportable::Complete;
     } else
         return IExportable::Incomplete;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::CodeEditorProjectItemWrapper::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectManagement::CodeEditorProjectItemWrapper::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
@@ -147,28 +145,13 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::ProjectMa
         return version_check_result;
 
     if (d->code_editor) {
-        QDomNodeList childNodes = object_node->childNodes();
-        for(int i = 0; i < childNodes.count(); ++i)
-        {
-            QDomNode childNode = childNodes.item(i);
-            QDomElement child = childNode.toElement();
+        while (doc->readNext() != QXmlStreamReader::EndElement) {
+            QStringRef child = doc->name();
 
-            if (child.isNull())
-                continue;
-
-            if (child.tagName() == QLatin1String("CodeEditorProjectItemWrapper")) {
-                QDomNodeList itemNodes = child.childNodes();
-                for(int i = 0; i < itemNodes.count(); ++i)
-                {
-                    QDomNode itemNode = itemNodes.item(i);
-
-                    QDomCDATASection cdata = itemNode.toCDATASection();
-                    if (cdata.isNull())
-                        continue;
-
-                    d->code_editor->codeEditor()->setPlainText(cdata.data());
-                    return IExportable::Complete;
-                }
+            if (child == "CodeEditorProjectItemWrapper") {
+                doc->readNext();
+                d->code_editor->codeEditor()->setPlainText(doc->text().toString());
+                return IExportable::Complete;
             }
         }
     }

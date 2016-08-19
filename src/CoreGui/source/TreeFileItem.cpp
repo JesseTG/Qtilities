@@ -13,7 +13,6 @@
 #include "QtilitiesCoreGuiConstants.h"
 #include "QtilitiesCoreConstants.h"
 
-#include <QDomElement>
 #include <QApplication>
 
 using namespace Qtilities::CoreGui::Constants;
@@ -47,25 +46,26 @@ Qtilities::Core::Interfaces::IExportable::ExportModeFlags Qtilities::CoreGui::Tr
     return flags;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeFileItem::exportXml(QDomDocument* doc, QDomElement* object_node) const {
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeFileItem::exportXml(QXmlStreamWriter* doc) const {
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesExportVersion(exportVersion(),exportTask());
     if (version_check_result != IExportable::VersionSupported)
         return version_check_result;
 
+    QMetaEnum e = QMetaEnum::fromType<TreeFileItem::PathDisplay>();
+
     // 1.1 Formatting:
-    IExportable::ExportResultFlags result = saveFormattingToXML(doc,object_node,exportVersion());
+    IExportable::ExportResultFlags result = saveFormattingToXML(doc,exportVersion());
 
     // 1.2 File Information:
-    QDomElement file_data = doc->createElement("FileInfo");
-    object_node->appendChild(file_data);
-    file_data.setAttribute("Path",filePath());
-    file_data.setAttribute("RelativeToPath",relativeToPath());
-    file_data.setAttribute("PathDisplay",(int) pathDisplay());
+    doc->writeEmptyElement("FileInfo");
+    doc->writeAttribute("Path",filePath());
+    doc->writeAttribute("RelativeToPath",relativeToPath());
+    doc->writeAttribute("PathDisplay", e.valueToKey(pathDisplay()));
+
     return result;
 }
 
-Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeFileItem::importXml(QDomDocument* doc, QDomElement* object_node, QList<QPointer<QObject> >& import_list) {
-    Q_UNUSED(doc)
+Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeFileItem::importXml(QXmlStreamReader* doc, QList<QPointer<QObject> >& import_list) {
     Q_UNUSED(import_list)
 
     IExportable::ExportResultFlags version_check_result = IExportable::validateQtilitiesImportVersion(exportVersion(),exportTask());
@@ -74,34 +74,37 @@ Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::
 
     IExportable::ExportResultFlags result = IExportable::Incomplete;
 
-    QDomNodeList dataNodes = object_node->childNodes();
-    for(int i = 0; i < dataNodes.count(); ++i) {
-        QDomNode dataNode = dataNodes.item(i);
-        QDomElement data = dataNode.toElement();
+    while (doc->readNext() != QXmlStreamReader::EndElement) {
+      QStringRef name = doc->name();
+      QXmlStreamAttributes attributes = doc->attributes();
 
-        if (data.isNull())
-            continue;
+      if (name == "FileInfo") {
+        // Restore the file path/name:
 
-        if (data.tagName() == QLatin1String("FileInfo")) {
-            // Restore the file path/name:
-            if (data.hasAttribute("Path")) {
-                setFileForce(data.attribute("Path"));
-                result = IExportable::Complete;
-            }
-            if (data.hasAttribute("RelativeToPath")) {
-                setRelativeToPath(data.attribute("RelativeToPath"));
-                result = IExportable::Complete;
-            }
-            if (data.hasAttribute("PathDisplay")) {
-                setPathDisplay((PathDisplay) data.attribute("PathDisplay").toInt());
-                result = IExportable::Complete;
-            }
+        if (attributes.hasAttribute("Path")) {
+          setFileForce(attributes.value("Path").toString());
+          result = IExportable::Complete;
         }
+
+        if (attributes.hasAttribute("RelativeToPath")) {
+          setRelativeToPath(attributes.value("RelativeToPath").toString());
+          result = IExportable::Complete;
+        }
+
+        if (attributes.hasAttribute("PathDisplay")) {
+          setPathDisplay((PathDisplay)attributes.value("PathDisplay").toInt());
+          result = IExportable::Complete;
+        }
+
+        doc->skipCurrentElement();
+      }
+      else if (name == "Formatting") {
+          IExportable::ExportResultFlags formatting_result = loadFormattingFromXML(doc,exportVersion());
+          if (formatting_result != IExportable::Complete)
+              result = formatting_result;
+      }
     }
 
-    IExportable::ExportResultFlags formatting_result = loadFormattingFromXML(doc,object_node,exportVersion());
-    if (formatting_result != IExportable::Complete)
-        result = formatting_result;
 
     return result;
 }

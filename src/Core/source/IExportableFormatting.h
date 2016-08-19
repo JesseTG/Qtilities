@@ -15,8 +15,8 @@
 #include "QtilitiesCore_global.h"
 #include "IExportable.h"
 
-class QDomDocument;
-class QDomElement;
+class QXmlStreamReader;
+class QXmlStreamWriter;
 
 namespace Qtilities {
     namespace Core {
@@ -35,10 +35,10 @@ namespace Qtilities {
                 //----------------------------
                 // XML Exporting
                 //----------------------------
-                //! Allows exporting of formatting information to a XML document. A reference to the QDomElement to which the object's information must be added is provided, along with a reference to the QDomDocument.
-                virtual IExportable::ExportResultFlags exportFormattingXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) const = 0;
-                //! Allows importing of formatting information from a XML document. A reference to the QDomElement which contains the object's information is provided, along with a reference to the QDomDocument.
-                virtual IExportable::ExportResultFlags importFormattingXML(QDomDocument* doc, QDomElement* object_node, Qtilities::ExportVersion version) = 0;
+                //! Allows exporting of formatting information to a XML document. A reference to the QXmlStreamWriter to which the object's information must be added is provided.
+                virtual IExportable::ExportResultFlags exportFormattingXML(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const = 0;
+                //! Allows importing of formatting information from a XML document. A reference to the QXmlStreamReader which contains the object's information is provided.
+                virtual IExportable::ExportResultFlags importFormattingXML(QXmlStreamReader* doc, Qtilities::ExportVersion version) = 0;
             };
         }
     }

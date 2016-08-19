@@ -11,10 +11,10 @@
 
 #include "BenchmarkTests.h"
 
+#include <QXmlStreamWriter>
+
 #include <QtilitiesCoreGui>
 using namespace QtilitiesCoreGui;
-
-#include <QDomDocument>
 
 int Qtilities::Testing::BenchmarkTests::execTest(int argc, char ** argv) {
     return QTest::qExec(this,argc,argv);
@@ -45,21 +45,23 @@ void Qtilities::Testing::BenchmarkTests::benchmarkObserverExport_1_0_1_0() {
     // Do the export:
     QFile file("testObserverDataOnlyWithCategoriesBenchmark_0_3_0_3.xml");
     file.open(QIODevice::WriteOnly);
-    QDomDocument doc("QtilitiesTesting");
-    QDomElement root = doc.createElement("QtilitiesTesting");
-    doc.appendChild(root);
-    QDomElement rootItem = doc.createElement("object_node");
-    root.appendChild(rootItem);
+
+    QXmlStreamWriter doc(&file);
+    doc.setAutoFormatting(true);
+    doc.setAutoFormattingIndent(2);
+    doc.writeComment("<!--Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString() + "-->\n");
+    doc.writeStartDocument("1.0");
+    doc.writeAttribute("encoding", "UTF-8");
+    doc.writeStartElement("QtilitiesTesting");
+    doc.writeStartElement("object_node");
+
     obj_source->setExportVersion(Qtilities::Qtilities_1_0);
 
+
     QBENCHMARK {
-        QVERIFY(obj_source->exportXml(&doc,&rootItem) == IExportable::Complete);
+        QVERIFY(obj_source->exportXml(&doc) == IExportable::Complete);
     }
 
-    QString docStr = doc.toString(2);
-    docStr.prepend("<!--Created by " + QApplication::applicationName() + " v" + QApplication::applicationVersion() + " on " + QDateTime::currentDateTime().toString() + "-->\n");
-    docStr.prepend("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    file.write(docStr.toUtf8());
     file.close();
 
     // Don't delete it here since deletion will make the test slower. Thus we don't care about the memory leaks.
@@ -73,18 +75,15 @@ void Qtilities::Testing::BenchmarkTests::benchmarkObserverImport_1_0_1_0() {
     TreeNode* obj_import_xml = new TreeNode;
 
     QFile file("testObserverDataOnlyWithCategoriesBenchmark_0_3_0_3.xml");
-    file.open(QIODevice::WriteOnly);
-    QDomDocument doc("QtilitiesTesting");
-    QDomElement root = doc.createElement("QtilitiesTesting");
-    doc.appendChild(root);
-    QDomElement rootItem = doc.createElement("object_node");
-    root.appendChild(rootItem);
+    file.open(QIODevice::ReadWrite);
+
+    QXmlStreamReader doc(&file);
 
     // Do the import:
     obj_import_xml->setExportVersion(Qtilities::Qtilities_1_0);
     QList<QPointer<QObject> > import_list;
 
-    QVERIFY(obj_import_xml->importXml(&doc,&rootItem,import_list) == IExportable::Complete);
+    QVERIFY(obj_import_xml->importXml(&doc,import_list) == IExportable::Complete);
 
     file.close();
     delete obj_import_xml;
