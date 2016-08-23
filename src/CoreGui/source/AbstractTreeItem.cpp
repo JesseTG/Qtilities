@@ -129,47 +129,58 @@ bool Qtilities::CoreGui::AbstractTreeItem::setName(const QString& new_name, Obse
 IExportable::ExportResultFlags Qtilities::CoreGui::AbstractTreeItem::saveFormattingToXML(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const {
     Q_UNUSED(version)
 
-    doc->writeStartElement("Formatting");
+    bool hasAlignment_ = hasAlignment();
+    bool hasBackgroundRole_ = hasBackgroundRole();
+    bool hasForegroundRole_ = hasForegroundRole();
+    bool hasStatusTip_ = hasStatusTip();
+    bool hasToolTip_ = hasToolTip();
+    bool hasWhatsThis_ = hasWhatsThis();
+    bool hasSizeHint_ = hasSizeHint();
+    bool hasFont_ = hasFont();
 
-    if (hasAlignment())
-        doc->writeAttribute("Alignment", QString::number((int) getAlignment()));
+    if (hasAlignment_ || hasBackgroundRole_ || hasForegroundRole_ || hasStatusTip_ || hasToolTip_ || hasWhatsThis_ || hasSizeHint_ || hasFont_) {
+        doc->writeStartElement("Formatting");
 
-    if (hasBackgroundRole())
-        doc->writeAttribute("BackgroundColor",getBackgroundRole().color().name());
+        if (hasAlignment_)
+            doc->writeAttribute("Alignment", QString::number((int) getAlignment()));
 
-    if (hasForegroundRole())
-        doc->writeAttribute("ForegroundColor",getForegroundRole().color().name());
+        if (hasBackgroundRole_)
+            doc->writeAttribute("BackgroundColor",getBackgroundRole().color().name());
 
-    if (hasStatusTip())
-        doc->writeAttribute("StatusTip",getStatusTip());
+        if (hasForegroundRole_)
+            doc->writeAttribute("ForegroundColor",getForegroundRole().color().name());
 
-    if (hasToolTip())
-        doc->writeAttribute("ToolTip",getToolTip());
+        if (hasStatusTip_)
+            doc->writeAttribute("StatusTip",getStatusTip());
 
-    if (hasWhatsThis())
-        doc->writeAttribute("WhatsThis",getWhatsThis());
+        if (hasToolTip_)
+            doc->writeAttribute("ToolTip",getToolTip());
 
-    if (hasSizeHint()) {
-        doc->writeEmptyElement("Size");
-        QSize size = getSizeHint();
+        if (hasWhatsThis_)
+            doc->writeAttribute("WhatsThis",getWhatsThis());
 
-        doc->writeAttribute("Width",QString::number(size.width()));
-        doc->writeAttribute("Height",QString::number(size.height()));
+        if (hasSizeHint_) {
+            doc->writeEmptyElement("Size");
+            QSize size = getSizeHint();
+
+            doc->writeAttribute("Width",QString::number(size.width()));
+            doc->writeAttribute("Height",QString::number(size.height()));
+        }
+
+        if (hasFont_) {
+            doc->writeEmptyElement("Font");
+
+            QFont font = getFont();
+            doc->writeAttribute("Family",font.family());
+            doc->writeAttribute("PointSize",QString::number(font.pointSize()));
+            doc->writeAttribute("Weight",QString::number(font.weight()));
+
+            doc->writeAttribute("Bold", (font.bold() ? "True" : "False"));
+            doc->writeAttribute("Italic", (font.italic() ? "True" : "False"));
+        }
+
+        doc->writeEndElement(/* Formatting */);
     }
-
-    if (hasFont()) {
-        doc->writeEmptyElement("Font");
-
-        QFont font = getFont();
-        doc->writeAttribute("Family",font.family());
-        doc->writeAttribute("PointSize",QString::number(font.pointSize()));
-        doc->writeAttribute("Weight",QString::number(font.weight()));
-
-        doc->writeAttribute("Bold", (font.bold() ? "True" : "False"));
-        doc->writeAttribute("Italic", (font.italic() ? "True" : "False"));
-    }
-
-    doc->writeEndElement();
 
     return IExportable::Complete;
 }

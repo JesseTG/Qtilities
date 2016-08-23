@@ -427,6 +427,9 @@ category_filter_enabled(false),
               */
             ObserverHints::RootIndexDisplayHint rootIndexDisplayHint() const;
 
+            //! Returns true if any hints are enabled.
+            bool anyHintsEnabled() const;
+
             // --------------------------------
             // Category Display Functionality
             // --------------------------------

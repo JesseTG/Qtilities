@@ -328,6 +328,22 @@ ObserverHints::RootIndexDisplayHint ObserverHints::rootIndexDisplayHint() const 
     return d->root_index_display_hint;
 }
 
+bool ObserverHints::anyHintsEnabled() const {
+    return d->action_hints != ActionNoHints
+        || d->activity_control != NoActivityControlHint
+        || d->activity_display != NoActivityDisplayHint
+        || d->display_flags != NoDisplayFlagsHint
+        || d->drag_drop_flags != NoDragDrop
+        || d->hierarhical_display != NoHierarchicalDisplayHint
+        || d->item_view_column_hint != ColumnNoHints
+        || d->naming_control != NoNamingControlHint
+        || d->observer_selection_context != SelectionUseParentContext
+        || d->modification_state_display != NoModificationStateDisplayHint
+        || d->category_editing_flags != CategoriesReadOnly
+        || d->root_index_display_hint != RootIndexHide
+        || !d->displayed_categories.isEmpty();
+}
+
 void Qtilities::Core::ObserverHints::setDisplayedCategories(const QList<QtilitiesCategory>& displayed_categories, bool inversed) {
     if (d->displayed_categories == displayed_categories && d->has_inversed_category_display == inversed)
         return;

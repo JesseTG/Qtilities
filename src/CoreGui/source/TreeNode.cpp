@@ -50,7 +50,9 @@ Qtilities::CoreGui::TreeNode::~TreeNode() {
 }
 
 Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeNode::exportFormattingXML(QXmlStreamWriter* doc, Qtilities::ExportVersion version) const {
-    return saveFormattingToXML(doc,version);
+    IExportable::ExportResultFlags result = saveFormattingToXML(doc,version);
+
+    return result;
 }
 
 Qtilities::Core::Interfaces::IExportable::ExportResultFlags Qtilities::CoreGui::TreeNode::importFormattingXML(QXmlStreamReader* doc, Qtilities::ExportVersion version) {
